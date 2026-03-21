@@ -1,0 +1,25 @@
+{
+  "name": "msalem-library",
+  "version": "1.0.0",
+  "main": "main/main.js",
+  "scripts": {
+    "dev": "concurrently \"vite --host\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build",
+    "tailwind:init": "npx tailwindcss init -p",
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "concurrently": "^9.1.2",
+    "electron": "^36.4.0",
+    "postcss": "^8.5.5",
+    "tailwindcss": "^4.1.10",
+    "vite": "^6.3.5",
+    "wait-on": "^8.0.3"
+  }
+}
