@@ -12,6 +12,10 @@ const ActiveBorrowedBooks = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [adminCreds, setAdminCreds] = useState({ email: "", password: "" });
 
+  // ✅ NEW: Electron Fix for Email Input
+  const [showEmailInput, setShowEmailInput] = useState(false);
+  const [emailAddress, setEmailAddress] = useState("");
+
   useEffect(() => {
     fetchBooks();
   }, []);
@@ -68,11 +72,10 @@ const ActiveBorrowedBooks = () => {
     }
   };
 
-  // ✅ NEW: EXPORT PDF FUNCTION
   const handleExportPDF = async () => {
     try {
       const response = await axios.get(
-       "http://localhost:5000/api/books/reports/active-books/pdf",
+        "http://localhost:5000/api/books/reports/active-books/pdf",
         {
           responseType: "blob",
           headers: {
@@ -89,19 +92,59 @@ const ActiveBorrowedBooks = () => {
       link.click();
     } catch (error) {
       console.error("Export failed:", error);
-      alert("Failed to export PDF.");
+      setStatus({ show: true, message: "Failed to export PDF.", type: "error" });
     }
   };
 
- return (
+  // ✅ UPDATED: Electron Friendly Email Function
+  const handleSendEmail = async () => {
+    if (!emailAddress) {
+      setStatus({ show: true, message: "Please enter an email address.", type: "error" });
+      return;
+    }
+
+    setShowEmailInput(false);
+    setStatus({ show: true, message: "Sending email... please wait.", type: "success" });
+
+    try {
+      const response = await axios.get(
+        `http://localhost:5000/api/books/reports/active-books/pdf?email=${emailAddress}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+          }
+        }
+      );
+      
+      setStatus({ show: true, message: response.data.message, type: "success" });
+      setEmailAddress(""); 
+      setTimeout(() => setStatus({ show: false }), 5000);
+    } catch (error) {
+      setStatus({ 
+        show: true, 
+        message: error.response?.data?.message || "Failed to send email.", 
+        type: "error" 
+      });
+      setTimeout(() => setStatus({ show: false }), 5000);
+    }
+  };
+
+  return (
     <div className="p-8 bg-yellow-50 min-h-screen">
       <BackButton label="⬅ Return to Dashboard" />
       
+      {/* FLOATING NOTIFICATION */}
       {status.show && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-xl ${
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-xl flex items-center gap-4 transition-all ${
           status.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
         }`}>
-          {status.message}
+          <span className="font-bold">{status.message}</span>
+          <button 
+            onClick={() => setStatus({ show: false })}
+            className="bg-black/20 hover:bg-black/40 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold transition-colors"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -109,24 +152,53 @@ const ActiveBorrowedBooks = () => {
         📖✅ Active Borrowed Books
       </h1>
 
-      {/* SEARCH AND EXPORT CONTAINER */}
-      <div className="mb-6 flex flex-col md:flex-row justify-center items-center gap-4">
-        <input
-          key={`search-${tableSession}`}
-          type="text"
-          placeholder="Search by borrower or book title..."
-          value={search}
-          autoComplete="off"
-          onChange={(e) => setSearch(e.target.value)}
-          className="border-2 border-green-200 p-2 rounded-lg w-80 focus:border-green-600 outline-none shadow-sm"
-        />
-        
-        <button
-          onClick={handleExportPDF}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors shadow-md flex items-center gap-2"
-        >
-          📄 Export PDF
-        </button>
+      <div className="mb-6 flex flex-col justify-center items-center gap-4">
+        <div className="flex flex-col md:flex-row gap-4">
+          <input
+            key={`search-${tableSession}`}
+            type="text"
+            placeholder="Search by borrower or book title..."
+            value={search}
+            autoComplete="off"
+            onChange={(e) => setSearch(e.target.value)}
+            className="border-2 border-green-200 p-2 rounded-lg w-80 focus:border-green-600 outline-none shadow-sm"
+          />
+          
+          <div className="flex gap-2">
+            <button
+              onClick={handleExportPDF}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors shadow-md flex items-center gap-2"
+            >
+              📄 Export PDF
+            </button>
+
+            <button
+              onClick={() => setShowEmailInput(!showEmailInput)}
+              className="bg-purple-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-purple-700 transition-colors shadow-md flex items-center gap-2"
+            >
+              📧 {showEmailInput ? "Cancel" : "Send Email"}
+            </button>
+          </div>
+        </div>
+
+        {/* INLINE EMAIL INPUT CONTAINER */}
+        {showEmailInput && (
+          <div className="flex gap-2 p-2 bg-white rounded-lg shadow-lg border-2 border-purple-100 animate-in fade-in slide-in-from-top-2">
+            <input
+              type="email"
+              placeholder="Enter librarian email"
+              className="border p-2 rounded text-sm w-64 outline-none focus:border-purple-500"
+              value={emailAddress}
+              onChange={(e) => setEmailAddress(e.target.value)}
+            />
+            <button
+              onClick={handleSendEmail}
+              className="bg-purple-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-purple-700"
+            >
+              Send
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto shadow-lg rounded-xl bg-white p-2">

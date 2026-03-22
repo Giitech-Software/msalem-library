@@ -14,17 +14,29 @@ function Login() {
 const handleLogin = async (e) => {
   e.preventDefault();
   setError("");
+  
   try {
     const res = await axios.post("http://localhost:5000/api/auth/login", {
       email,
       password,
     });
+    
+    // Save the token (which now contains the 'role' for the Dashboard)
     localStorage.setItem("token", res.data.token);
     
-    // ✅ FIXED: Navigate to dashboard, not /home
+    // Navigate to dashboard
     navigate("/dashboard", { replace: true }); 
+    
   } catch (err) {
-    setError("Invalid credentials");
+    // Check if the error is specifically about suspension (403)
+    if (err.response && err.response.status === 403) {
+      setError("🚫 This account has been suspended. Please contact the Superadmin.");
+    } else if (err.response && err.response.data.message) {
+      // Show backend error message if available (e.g., "Invalid credentials")
+      setError(err.response.data.message);
+    } else {
+      setError("Unable to connect to server. Please try again.");
+    }
   }
 };
 // ... rest of component

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react"; 
 import { Link } from "react-router-dom";
 import logo from "../assets/school_logo.svg";
-import banner1 from "../assets/library_banner1.jpg";
-import banner2 from "../assets/library_banner2.jpg";
-import banner3 from "../assets/library_banner3.jpg";
+import banner1 from "../assets/library_banner1.png";
+import banner2 from "../assets/library_banner2.png";
+import banner3 from "../assets/library_banner3.png";
 
 const readingQuotes = [
   "🧠 Reading is to the mind what exercise is to the body — Joseph Addison.",

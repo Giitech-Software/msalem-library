@@ -49,10 +49,10 @@ router.post('/login', async (req, res) => {
   }
 
   const token = jwt.sign(
-    { id: admin._id },
-    process.env.JWT_SECRET,
-    { expiresIn: '1d' }
-  );
+  { id: admin._id, role: admin.role }, // Add 'role' here!
+  process.env.JWT_SECRET,
+  { expiresIn: '1d' }
+);
 
   res.json({ token });
 });
@@ -61,41 +61,55 @@ router.post('/login', async (req, res) => {
 // ================= STEP 7 STARTS HERE =================
 
 // CREATE ADMIN (Super Admin only)
-router.post("/create-admin", auth, superAdmin, async (req, res) => {
-  const { email, password } = req.body;
-
-  const existing = await Admin.findOne({ email });
-  if (existing) {
-    return res.status(400).json({ message: "Admin already exists" });
+// 1. GET ALL USERS (New - Needed for the Management Table)
+router.get("/users", auth, superAdmin, async (req, res) => {
+  try {
+    // Fetch all admins but do not send their hashed passwords to the frontend
+    const users = await Admin.find().select("-password");
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch users" });
   }
-
-  const admin = new Admin({
-    email,
-    password,
-    role: "admin"
-  });
-
-  await admin.save();
-
-  res.json({ message: "Admin created" });
 });
 
+// 2. TOGGLE STATUS (Replaces your old Suspend route)
+// This handles both "active" -> "suspended" and "suspended" -> "active"
+router.patch("/users/:id", auth, superAdmin, async (req, res) => {
+  try {
+    const { status } = req.body; // Expecting { "status": "suspended" } or "active"
+    const user = await Admin.findById(req.params.id);
 
-// SUSPEND ADMIN
-router.put("/suspend-admin/:id", auth, superAdmin, async (req, res) => {
-  await Admin.findByIdAndUpdate(req.params.id, {
-    status: "suspended"
-  });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-  res.json({ message: "Admin suspended" });
+    // Safety: Prevent suspending the superadmin (yourself)
+    if (user.role === "superadmin") {
+      return res.status(400).json({ message: "Cannot modify Superadmin status" });
+    }
+
+    user.status = status;
+    await user.save();
+    res.json({ message: `Admin status updated to ${status}` });
+  } catch (err) {
+    res.status(500).json({ message: "Update failed" });
+  }
 });
 
+// 3. DELETE ADMIN (Improved with Safety Check)
+router.delete("/users/:id", auth, superAdmin, async (req, res) => {
+  try {
+    const user = await Admin.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-// DELETE ADMIN
-router.delete("/delete-admin/:id", auth, superAdmin, async (req, res) => {
-  await Admin.findByIdAndDelete(req.params.id);
+    // Safety: Prevent deleting the superadmin
+    if (user.role === "superadmin") {
+      return res.status(400).json({ message: "Cannot delete Superadmin" });
+    }
 
-  res.json({ message: "Admin deleted" });
+    await Admin.findByIdAndDelete(req.params.id);
+    res.json({ message: "Admin permanently removed" });
+  } catch (err) {
+    res.status(500).json({ message: "Delete failed" });
+  }
 });
 
 

@@ -1,5 +1,6 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import ProtectedRoute from "./components/ProtectedRoute"; // Import your updated component
 
 // Pages
 import HomePage from "./pages/HomePage";
@@ -14,6 +15,7 @@ import Statistics from "./pages/Statistics";
 import OverdueBooks from "./pages/OverdueBooks";
 import StudentList from "./pages/StudentList";
 import StaffList from "./pages/StaffList";
+import AdminManagement from "./pages/AdminManagement"; 
 
 const AppRoutes = () => {
   return (
@@ -22,17 +24,28 @@ const AppRoutes = () => {
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<Login />} />
 
-      {/* Admin Pages */}
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/active-books" element={<ActiveBooks />} />
-      <Route path="/add-book" element={<BookBorrowForm />} />
-      <Route path="/add-book-title" element={<AddBookCatalog />} />
-      <Route path="/archived-books" element={<ArchivedBooks />} />
-      <Route path="/statistics" element={<Statistics />} />
-      <Route path="/overdue" element={<OverdueBooks />} />
-      <Route path="/book-catalog" element={<BookCatalog />} />
-<Route path="/students" element={<StudentList />} />
-<Route path="/staff" element={<StaffList />} />
+      {/* Standard Admin Pages (Need Token) */}
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/active-books" element={<ProtectedRoute><ActiveBooks /></ProtectedRoute>} />
+      <Route path="/add-book" element={<ProtectedRoute><BookBorrowForm /></ProtectedRoute>} />
+      <Route path="/add-book-title" element={<ProtectedRoute><AddBookCatalog /></ProtectedRoute>} />
+      <Route path="/archived-books" element={<ProtectedRoute><ArchivedBooks /></ProtectedRoute>} />
+      <Route path="/statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
+      <Route path="/overdue" element={<ProtectedRoute><OverdueBooks /></ProtectedRoute>} />
+      <Route path="/book-catalog" element={<ProtectedRoute><BookCatalog /></ProtectedRoute>} />
+      <Route path="/students" element={<ProtectedRoute><StudentList /></ProtectedRoute>} />
+      <Route path="/staff" element={<ProtectedRoute><StaffList /></ProtectedRoute>} />
+
+      {/* ✅ Superadmin ONLY Page (Needs Token AND Role) */}
+      <Route 
+        path="/admin-management" 
+        element={
+          <ProtectedRoute requiredRole="superadmin">
+            <AdminManagement />
+          </ProtectedRoute>
+        } 
+      />
+
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
