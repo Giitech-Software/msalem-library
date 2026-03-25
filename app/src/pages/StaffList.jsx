@@ -7,6 +7,10 @@ const StaffList = () => {
   const [view, setView] = useState("list");
   const [bulkNames, setBulkNames] = useState("");
   const [status, setStatus] = useState({ show: false, message: "", type: "" });
+  
+  // States for Editing
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
 
   useEffect(() => { fetchStaff(); }, []);
 
@@ -28,6 +32,33 @@ const StaffList = () => {
       fetchStaff();
     } catch (err) { 
       showStatus("Error adding staff members.", "error");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to remove this staff member?")) return;
+    try {
+      await axios.delete(`http://localhost:5000/api/staff/${id}`);
+      showStatus("Staff member removed.", "success");
+      fetchStaff();
+    } catch (err) {
+      showStatus("Failed to delete staff member.", "error");
+    }
+  };
+
+  const startEdit = (member) => {
+    setEditingId(member._id);
+    setEditName(member.name);
+  };
+
+  const handleUpdate = async (id) => {
+    try {
+      await axios.put(`http://localhost:5000/api/staff/${id}`, { name: editName });
+      showStatus("Staff member updated!", "success");
+      setEditingId(null);
+      fetchStaff();
+    } catch (err) {
+      showStatus("Update failed.", "error");
     }
   };
 
@@ -79,13 +110,40 @@ const StaffList = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-in slide-in-from-bottom-4 duration-500">
             {staff.map(s => (
-              <div key={s._id} className="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-yellow-500 flex justify-between items-center hover:shadow-md transition group">
-                <div>
-                  <p className="font-bold text-gray-800 group-hover:text-green-700 transition">{s.name}</p>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Official Staff</p>
+              <div key={s._id} className="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-yellow-500 flex flex-col justify-between hover:shadow-md transition group">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1 mr-2">
+                    {editingId === s._id ? (
+                      <input 
+                        className="w-full border-b-2 border-green-700 outline-none font-bold text-gray-800"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        autoFocus
+                      />
+                    ) : (
+                      <>
+                        <p className="font-bold text-gray-800 group-hover:text-green-700 transition">{s.name}</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Official Staff</p>
+                      </>
+                    )}
+                  </div>
+                  <div className="bg-yellow-50 p-2 rounded-full text-xl group-hover:bg-yellow-100 transition">
+                    👤
+                  </div>
                 </div>
-                <div className="bg-yellow-50 p-2 rounded-full text-xl group-hover:bg-yellow-100 transition">
-                  👤
+
+                <div className="flex gap-2 pt-2 border-t border-gray-50">
+                  {editingId === s._id ? (
+                    <>
+                      <button onClick={() => handleUpdate(s._id)} className="flex-1 text-[10px] font-bold uppercase bg-green-700 text-white py-1.5 rounded-lg hover:bg-green-800">Save</button>
+                      <button onClick={() => setEditingId(null)} className="flex-1 text-[10px] font-bold uppercase bg-gray-200 text-gray-700 py-1.5 rounded-lg">Cancel</button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => startEdit(s)} className="flex-1 text-[10px] font-bold uppercase bg-blue-50 text-blue-700 py-1.5 rounded-lg hover:bg-blue-100 transition">Edit</button>
+                      <button onClick={() => handleDelete(s._id)} className="flex-1 text-[10px] font-bold uppercase bg-red-50 text-red-700 py-1.5 rounded-lg hover:bg-red-100 transition">Delete</button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"; 
 import { Link } from "react-router-dom";
-import logo from "../assets/school_logo.svg";
+import logo from "../assets/school_logo.svg"; // Make sure to add a logo image in this path
 import banner1 from "../assets/library_banner1.png";
 import banner2 from "../assets/library_banner2.png";
 import banner3 from "../assets/library_banner3.png";
@@ -38,7 +38,7 @@ const HomePage = () => {
         <div className="flex items-center gap-4">
           <img src={logo} alt="School Logo" className="h-12 md:h-16 w-auto rounded-full" />
           <h1 className="text-lg md:text-3xl font-extrabold text-yellow-400 tracking-tight">
-            M'Salem School Library
+            Welcome to M'Salem School Library!
           </h1>
         </div>
 

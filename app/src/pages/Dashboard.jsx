@@ -1,13 +1,15 @@
 import React, { useEffect, useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { jwtDecode } from "jwt-decode"; // You may need to: npm install jwt-decode
+import { jwtDecode } from "jwt-decode";
+import axios from "axios"; // Added axios import
 
 const Dashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [userRole, setUserRole] = useState("");
+  const [overdueCount, setOverdueCount] = useState(0); // State for overdue count
 
-  // Base menu items available to everyone
+  // Base menu items
   const menuItems = [
     { name: "✅ Active Books", path: "/active-books" },
     { name: "📖 Borrow Book", path: "/add-book" },
@@ -16,15 +18,13 @@ const Dashboard = () => {
     { name: "👔 Staff List", path: "/staff" },
     { name: "🗂️ Archived Books", path: "/archived-books" },
     { name: "📊 Statistics", path: "/statistics" },
-    { name: "⏰ Overdue Books", path: "/overdue" },
+    { name: "⏰ Overdue Books", path: "/overdue", showBadge: true }, // Added flag for badge
     { name: "🧾 Book Catalog", path: "/book-catalog" }
   ];
 
-  // Logic to check role and add Superadmin menu
   const getFullMenu = () => {
     const finalMenu = [...menuItems];
     if (userRole === "superadmin") {
-      // Adds the management link at the very top for easy access
       finalMenu.unshift({ name: "🛡️ Admin Management", path: "/admin-management" });
     }
     return finalMenu;
@@ -35,22 +35,31 @@ const Dashboard = () => {
     navigate("/", { replace: true });
   }, [navigate]);
 
+  // Fetch Overdue Count function
+  const fetchOverdueCount = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/books/overdue");
+      setOverdueCount(res.data.length);
+    } catch (error) {
+      console.error("Failed to fetch overdue count:", error);
+    }
+  };
+
   useEffect(() => {
-    // 1. Get User Role from Token on Load
     const token = localStorage.getItem("token");
     if (token) {
       try {
         const decoded = jwtDecode(token);
-        setUserRole(decoded.role); // Assuming your JWT payload has { role: "admin" }
+        setUserRole(decoded.role);
+        fetchOverdueCount(); // Fetch count on load
       } catch (error) {
         console.error("Invalid token");
         handleLogout();
       }
     } else {
-      handleLogout(); // No token? Kick them out.
+      handleLogout();
     }
 
-    // 2. Idle Auto-Logout Logic
     let timer;
     const resetTimer = () => {
       if (timer) clearTimeout(timer);
@@ -78,13 +87,20 @@ const Dashboard = () => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`px-4 py-1.5 rounded-xl text-lg font-semibold transition-all duration-300 border-l-4 ${
+                className={`px-4 py-1.5 rounded-xl text-lg font-semibold transition-all duration-300 border-l-4 flex justify-between items-center ${
                   location.pathname === item.path 
                     ? "bg-yellow-400 text-green-900 shadow-md border-green-900 translate-x-1" 
                     : "hover:bg-green-600 hover:text-yellow-300 border-transparent"
                 }`}
               >
-                {item.name}
+                <span>{item.name}</span>
+                
+                {/* Notification Badge */}
+                {item.showBadge && overdueCount > 0 && (
+                  <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full animate-bounce shadow-sm border border-white">
+                    {overdueCount}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>
@@ -111,7 +127,6 @@ const Dashboard = () => {
 
         <div className="flex-1 flex items-center justify-center text-center p-10">
           <div className="bg-white p-12 rounded-3xl shadow-xl border-2 border-yellow-100 max-w-2xl relative overflow-hidden">
-             {/* Subtle indicator for Superadmin */}
              {userRole === 'superadmin' && (
                 <div className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] px-3 py-1 font-bold uppercase rounded-bl-lg">
                   Superadmin Access

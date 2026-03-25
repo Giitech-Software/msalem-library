@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Student = require("../models/Student");
 const Staff = require("../models/Staff");
+const ArchivedStudent = require("../models/ArchivedStudent");
 
 // --- STUDENT ROUTES ---
 
@@ -24,19 +25,15 @@ router.post("/students/bulk", async (req, res) => {
   }
 
   try {
-    // Prepare documents for bulk insert
     const studentDocs = names.map(name => ({
       name,
       category,
       subCategory
     }));
 
-    // ordered: false allows the operation to continue even if some names are duplicates
     await Student.insertMany(studentDocs, { ordered: false });
-    
     res.status(201).json({ message: "Bulk import successful" });
   } catch (err) {
-    // If some were duplicates but others were saved, we still consider it a partial success
     if (err.code === 11000) {
       return res.status(201).json({ message: "Import completed (Duplicates skipped)" });
     }
@@ -44,6 +41,71 @@ router.post("/students/bulk", async (req, res) => {
   }
 });
 
+// NEW: UPDATE single student name
+router.put("/students/:id", async (req, res) => {
+  try {
+    const { name } = req.body;
+    const updatedStudent = await Student.findByIdAndUpdate(
+      req.params.id,
+      { name },
+      { new: true }
+    );
+    res.json(updatedStudent);
+  } catch (err) {
+    res.status(500).json({ message: "Update failed", error: err.message });
+  }
+});
+
+// PROMOTE students
+router.post("/students/promote", async (req, res) => {
+  const { fromSubCategory, toSubCategory } = req.body;
+  try {
+    const result = await Student.updateMany(
+      { subCategory: fromSubCategory },
+      { $set: { subCategory: toSubCategory } }
+    );
+    res.json({ 
+      message: `Successfully promoted ${result.modifiedCount} students from ${fromSubCategory} to ${toSubCategory}.`,
+      count: result.modifiedCount 
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Promotion failed", error: err.message });
+  }
+});
+
+// DELETE single student
+router.delete("/students/:id", async (req, res) => {
+  try {
+    await Student.findByIdAndDelete(req.params.id);
+    res.json({ message: "Student removed" });
+  } catch (err) {
+    res.status(500).json({ message: "Delete failed" });
+  }
+});
+
+// GRADUATION / ARCHIVE
+router.post("/students/graduate", async (req, res) => {
+  const { subCategory } = req.body;
+  try {
+    const graduatingStudents = await Student.find({ subCategory });
+    if (graduatingStudents.length === 0) {
+      return res.status(404).json({ message: "No students found in this class to graduate." });
+    }
+    const archiveData = graduatingStudents.map(s => ({
+      name: s.name,
+      category: s.category,
+      subCategory: s.subCategory
+    }));
+    await ArchivedStudent.insertMany(archiveData);
+    const result = await Student.deleteMany({ subCategory });
+    res.json({ 
+      message: `Successfully graduated ${result.deletedCount} students from ${subCategory}.`,
+      count: result.deletedCount 
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Graduation process failed", error: err.message });
+  }
+});
 
 // --- STAFF ROUTES ---
 
@@ -60,14 +122,11 @@ router.get("/staff", async (req, res) => {
 // BULK INSERT staff
 router.post("/staff/bulk", async (req, res) => {
   const { names } = req.body;
-
   if (!names || !Array.isArray(names)) {
     return res.status(400).json({ message: "Invalid names list" });
   }
-
   try {
     const staffDocs = names.map(name => ({ name }));
-    
     await Staff.insertMany(staffDocs, { ordered: false });
     res.status(201).json({ message: "Staff bulk import successful" });
   } catch (err) {
@@ -77,67 +136,30 @@ router.post("/staff/bulk", async (req, res) => {
     res.status(500).json({ message: "Bulk import failed" });
   }
 });
-// Add this to backend/routes/lists.js
 
-router.post("/students/promote", async (req, res) => {
-  const { fromSubCategory, toSubCategory } = req.body;
-
+// UPDATE single staff member
+router.put("/staff/:id", async (req, res) => {
   try {
-    // This updates all students in a specific class to the new class name
-    const result = await Student.updateMany(
-      { subCategory: fromSubCategory },
-      { $set: { subCategory: toSubCategory } }
+    const { name } = req.body;
+    const updatedStaff = await Staff.findByIdAndUpdate(
+      req.params.id,
+      { name },
+      { new: true }
     );
-
-    res.json({ 
-      message: `Successfully promoted ${result.modifiedCount} students from ${fromSubCategory} to ${toSubCategory}.`,
-      count: result.modifiedCount 
-    });
+    res.json(updatedStaff);
   } catch (err) {
-    res.status(500).json({ message: "Promotion failed", error: err.message });
+    res.status(500).json({ message: "Update failed", error: err.message });
   }
 });
 
-// Route to delete a single student (for cleanup)
-router.delete("/students/:id", async (req, res) => {
+// DELETE single staff member
+router.delete("/staff/:id", async (req, res) => {
   try {
-    await Student.findByIdAndDelete(req.params.id);
-    res.json({ message: "Student removed" });
+    await Staff.findByIdAndDelete(req.params.id);
+    res.json({ message: "Staff member removed successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Delete failed" });
+    res.status(500).json({ message: "Delete failed", error: err.message });
   }
 });
-const ArchivedStudent = require("../models/ArchivedStudent");
 
-// GRADUATION / ARCHIVE ROUTE
-router.post("/students/graduate", async (req, res) => {
-  const { subCategory } = req.body; // e.g., "SHS3" or "JHS3"
-
-  try {
-    // 1. Find all students in the graduating class
-    const graduatingStudents = await Student.find({ subCategory });
-
-    if (graduatingStudents.length === 0) {
-      return res.status(404).json({ message: "No students found in this class to graduate." });
-    }
-
-    // 2. Format them for the Archive
-    const archiveData = graduatingStudents.map(s => ({
-      name: s.name,
-      category: s.category,
-      subCategory: s.subCategory
-    }));
-
-    // 3. Insert into Archive and Delete from Active
-    await ArchivedStudent.insertMany(archiveData);
-    const result = await Student.deleteMany({ subCategory });
-
-    res.json({ 
-      message: `Successfully graduated ${result.deletedCount} students from ${subCategory}.`,
-      count: result.deletedCount 
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Graduation process failed", error: err.message });
-  }
-});
 module.exports = router;

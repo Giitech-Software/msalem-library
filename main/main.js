@@ -1,22 +1,24 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-// Add this inside your main.js file
-const { ipcMain } = require('electron');
+const { fork } = require('child_process');
 
-ipcMain.on('focus-fix', (event) => {
-  const win = event.sender.getOwnerBrowserWindow();
-  if (win) {
-    win.blur();
-    win.focus();
-  }
-});
-// 1. FORCE SOFTWARE RENDERING
-// This is the most common fix for inputs that freeze in Electron but work in Chrome.
-// It stops the GPU from "hanging" the UI during React state updates.
+let backendProcess;
+const isDev = !app.isPackaged;
+
+// --- 1. BACKEND PROCESS MANAGEMENT ---
+function startBackend() {
+  // Points to your backend entry point
+  const backendPath = path.join(__dirname, '../backend/server.js');
+  
+  backendProcess = fork(backendPath, [], {
+    env: { ...process.env, NODE_ENV: 'production' }
+  });
+
+  backendProcess.on('error', (err) => console.error('Backend Process Error:', err));
+}
+
+// --- 2. ELECTRON OPTIMIZATIONS (The Freeze Fixes) ---
 app.disableHardwareAcceleration();
-
-// 2. DISABLE WINDOW OCCLUSION & GPU COMPOSITING
-// Prevents the OS from "sleeping" the renderer process when it thinks the window is static.
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 app.commandLine.appendSwitch('disable-gpu-compositing');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
@@ -25,36 +27,41 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
-    show: false, // Hidden until ready to prevent flickering
+    show: false,
     autoHideMenuBar: true,
-    backgroundColor: '#ffffff', 
+    backgroundColor: '#ffffff',
+    // ✅ ICON PATH
+    icon: path.join(__dirname, '../app/public/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
       contextIsolation: false,
-      // 3. CRITICAL: Ensures the renderer stays active during form processing
-      backgroundThrottling: false, 
+      backgroundThrottling: false,
       spellcheck: false,
     },
   });
 
-  win.loadURL('http://localhost:5173');
+  // --- 3. DYNAMIC LOADING (Dev vs Prod) ---
+  if (isDev) {
+    win.loadURL('http://localhost:5173');
+  } else {
+    // In production, we load the built React index.html
+    win.loadFile(path.join(__dirname, '../app/dist/index.html'));
+  }
 
   win.once('ready-to-show', () => {
     win.maximize();
     win.show();
     win.focus();
 
-    // 4. THE "AUTO-REPAINT" FIX
-    // Every time the user interacts (clicks or types), force the window to redraw.
-    // This automates the "minimize/maximize" fix you were doing manually.
+    // Redraw fix for inputs
     win.webContents.on('before-input-event', () => {
       if (win.isFocused()) {
         win.webContents.invalidate();
       }
     });
 
-    // Initial resize hack for a clean start
+    // Initial resize hack
     setTimeout(() => {
       if (!win.isDestroyed()) {
         const [width, height] = win.getSize();
@@ -67,7 +74,9 @@ function createWindow() {
   win.setMenuBarVisibility(false);
 }
 
+// --- 4. APP LIFECYCLE ---
 app.whenReady().then(() => {
+  if (!isDev) startBackend(); // Only start backend via Electron in production
   createWindow();
 
   app.on('activate', () => {
@@ -76,7 +85,15 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
+  if (backendProcess) backendProcess.kill(); // Kill backend when app closes
+  if (process.platform !== 'darwin') app.quit();
+});
+
+// Focus fix IPC
+ipcMain.on('focus-fix', (event) => {
+  const win = event.sender.getOwnerBrowserWindow();
+  if (win) {
+    win.blur();
+    win.focus();
   }
 });

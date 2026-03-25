@@ -2,21 +2,52 @@
   "name": "msalem-library",
   "version": "1.0.0",
   "main": "main/main.js",
-  "scripts": {
-    "dev": "concurrently \"vite --host\" \"wait-on http://localhost:5173 && electron .\"",
-    "build": "vite build",
-    "tailwind:init": "npx tailwindcss init -p",
-    "start": "electron .",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
+  "description": "M'Salem School Library Management System",
+  "author": "M'Salem School",
   "license": "ISC",
-  "description": "",
+  "scripts": {
+    "dev": "concurrently \"cd app && vite --host\" \"wait-on http://localhost:5173 && electron .\"",
+    "start": "electron .",
+    "app-build": "cd app && npm run build",
+    "dist": "npm run app-build && electron-builder"
+  },
+  "build": {
+    "appId": "com.msalem.library",
+    "productName": "M'Salem Library",
+    "extraMetadata": {
+      "main": "main/main.js" 
+    },
+    "directories": {
+      "output": "dist_installer"
+    },
+    "files": [
+      "main/**/*",
+      "backend/**/*",
+      "app/dist/**/*",
+      "node_modules/**/*",
+      "package.json" 
+    ],
+    "win": {
+      "icon": "app/public/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "M'Salem Library"
+    }
+  },
   "devDependencies": {
     "autoprefixer": "^10.4.21",
     "concurrently": "^9.1.2",
     "electron": "^36.4.0",
+    "electron-builder": "^26.8.1",
     "postcss": "^8.5.5",
     "tailwindcss": "^4.1.10",
     "vite": "^6.3.5",
