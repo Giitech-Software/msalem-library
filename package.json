@@ -1,10 +1,11 @@
 {
   "name": "msalem-library",
   "version": "1.0.0",
+  "description": "Library Management System for M-Salem",
+  "author": "M-Salem",
   "main": "main/main.js",
   "scripts": {
-    "dev": "concurrently \"cd app && vite --host\" \"wait-on http://localhost:5173 && electron .\"",
-    "start": "electron .",
+    "dev": "concurrently \"cd app && npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "app-build": "cd app && npm run build",
     "dist": "npm run app-build && electron-builder"
   },
@@ -12,28 +13,21 @@
     "appId": "com.msalem.library",
     "productName": "M'Salem Library",
     "directories": {
-      "app": ".", 
+      "app": ".",
       "output": "dist_installer"
     },
     "files": [
-      "main/main.js",
-      "main/preload.js",
+      "main/**/*",
       "app/dist/**/*",
       "package.json",
-      "!backend/node_modules"
+      "!backend/**/*",
+      "!app/node_modules/**/*",
+      "!app/package.json"
     ],
     "extraResources": [
       {
         "from": "backend",
         "to": "backend",
-        "filter": [
-          "**/*",
-          "!node_modules"
-        ]
-      },
-      {
-        "from": "backend/node_modules",
-        "to": "backend/server_deps",
         "filter": [
           "**/*"
         ]
@@ -43,11 +37,12 @@
     "win": {
       "icon": "app/public/icon.ico",
       "forceCodeSigning": false,
-      "cscLink": null,
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -65,13 +60,9 @@
     "mongoose": "^8.23.0"
   },
   "devDependencies": {
-    "autoprefixer": "^10.4.21",
     "concurrently": "^9.1.2",
     "electron": "^36.4.0",
     "electron-builder": "^26.8.1",
-    "postcss": "^8.5.5",
-    "tailwindcss": "^4.1.10",
-    "vite": "^6.3.5",
     "wait-on": "^8.0.3"
   }
 }

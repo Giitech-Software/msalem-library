@@ -1,7 +1,7 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
-const fs = require('fs'); // Added back fs for production path checking
+const fs = require('fs');
 
 // 1. VARIABLE DECLARATIONS
 let backendProcess;
@@ -13,39 +13,43 @@ function startBackend() {
   let nodeModulesPath;
 
   if (isDev) {
-    // Development: standard folder structure
-    backendPath = path.join(__dirname, '../backend/server.js');
-    nodeModulesPath = path.join(__dirname, '../backend/node_modules');
+    // Development: Step out of /main to find /backend
+    backendPath = path.join(__dirname, '..', 'backend', 'server.js');
+    nodeModulesPath = path.join(__dirname, '..', 'backend', 'node_modules');
   } else {
-    // PRODUCTION: Look inside the resources/backend folder (from extraResources)
+    // PRODUCTION: Look in the "resources" folder (outside the ASAR)
     const resourcesBackend = path.join(process.resourcesPath, 'backend');
     backendPath = path.join(resourcesBackend, 'server.js');
-    
-    // RENAMING BYPASS: 
-    // We check for 'server_deps' because our package.json now renames 
-    // the backend node_modules to 'server_deps' during the build 
-    // to hide them from the electron-builder scanner.
-    const renamedModules = path.join(resourcesBackend, 'server_deps');
-    const standardModules = path.join(resourcesBackend, 'node_modules');
+    nodeModulesPath = path.join(resourcesBackend, 'node_modules');
+  }
 
-    if (fs.existsSync(renamedModules)) {
-      nodeModulesPath = renamedModules;
-    } else {
-      nodeModulesPath = standardModules;
+  // --- CRITICAL DIAGNOSTIC CHECK ---
+  if (!fs.existsSync(backendPath)) {
+    if (!isDev) {
+      dialog.showErrorBox(
+        "Backend Error: File Not Found",
+        `Server file missing at: ${backendPath}\n\nPlease ensure 'backend' was included in extraResources.`
+      );
     }
+    return;
+  }
 
-    // Emergency Fallback: If ASAR unpacking was used
-    const unpackedBackend = path.join(process.resourcesPath, 'app.asar.unpacked', 'backend', 'server.js');
-    if (!fs.existsSync(backendPath) && fs.existsSync(unpackedBackend)) {
-      backendPath = unpackedBackend;
+  // Check if node_modules exists specifically
+  if (!fs.existsSync(nodeModulesPath)) {
+    if (!isDev) {
+      dialog.showErrorBox(
+        "Backend Error: Modules Missing",
+        `The 'node_modules' folder is missing at: ${nodeModulesPath}\n\nThe backend cannot start without its dependencies.`
+      );
     }
+    return;
   }
 
   backendProcess = fork(backendPath, [], {
     env: { 
       ...process.env, 
       NODE_ENV: isDev ? 'development' : 'production',
-      NODE_PATH: nodeModulesPath, // CRITICAL: Tells the backend where its libraries are
+      NODE_PATH: nodeModulesPath, // Required for the backend to find its dependencies
       MONGO_URI: process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/msalem_library'
     },
     cwd: path.dirname(backendPath),
@@ -61,7 +65,7 @@ function startBackend() {
   });
 }
 
-// --- 3. ELECTRON OPTIMIZATIONS (The Freeze Fixes) ---
+// --- 3. ELECTRON OPTIMIZATIONS ---
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
@@ -72,11 +76,12 @@ function createWindow() {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#ffffff',
+    // Dynamic icon path logic
     icon: isDev 
-      ? path.join(__dirname, '../app/public/icon.png') 
-      : path.join(__dirname, '../app/dist/icon.png'),
+      ? path.join(__dirname, '..', 'app', 'public', 'icon.png') 
+      : path.join(__dirname, '..', 'app', 'dist', 'icon.png'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.js'), 
       nodeIntegration: true, 
       contextIsolation: false,
       backgroundThrottling: false,
@@ -88,7 +93,8 @@ function createWindow() {
   if (isDev) {
     win.loadURL('http://localhost:5173');
   } else {
-    win.loadFile(path.join(__dirname, '../app/dist/index.html'));
+    // Production: Step out of /main to find /app/dist/index.html
+    win.loadFile(path.join(__dirname, '..', 'app', 'dist', 'index.html'));
   }
 
   win.once('ready-to-show', () => {
@@ -96,7 +102,7 @@ function createWindow() {
     win.show();
     win.focus();
 
-    // Trigger a single redraw to prevent the "white screen" or "frozen input" bug
+    // Redraw fix for white screen on some Windows configurations
     setTimeout(() => {
       if (!win.isDestroyed()) {
         const [w, h] = win.getSize();
