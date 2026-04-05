@@ -1,10 +1,31 @@
-// backend/routes/bookCatalog.routes.js
 const express = require("express");
 const router = express.Router();
+const multer = require("multer"); // ✅ Added for PDF handling
+const path = require("path");
 const BookCatalog = require("../models/BookCatalog");
 const Admin = require("../models/Admin");
-const Log = require("../models/Log"); // ✅ Added Log model
-const auth = require("../middleware/auth"); // ✅ Added auth middleware
+const Log = require("../models/Log"); 
+const auth = require("../middleware/auth"); 
+
+// --- 📂 MULTER CONFIGURATION ---
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/pdfs/"); 
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname.replace(/\s/g, "_"));
+  }
+});
+
+const upload = multer({ 
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "application/pdf") cb(null, true);
+    else cb(new Error("Only PDFs allowed"), false);
+  },
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+});
 
 // GET all catalog books
 router.get("/", async (req, res) => {
@@ -16,29 +37,45 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST new book
-router.post("/add", auth, async (req, res) => {
+// POST new book (Enhanced for PDF & Enterprise Costing)
+router.post("/add", auth, upload.single("pdf"), async (req, res) => {
   try {
-    const title = req.body.title.trim();
-    const existing = await BookCatalog.findOne({ title });
-    
+    const { title, author, category, totalQuantity, isbn, publishedYear, description, basePrice, bookType } = req.body;
+    const cleanTitle = title.trim();
+
+    const existing = await BookCatalog.findOne({ title: cleanTitle });
     if (existing) {
       return res.status(400).json({ message: "Book title already exists." });
     }
 
-    const book = new BookCatalog({ ...req.body, title });
+    // Prepare book data (Handling String-to-Number conversion for FormData)
+    const bookData = {
+      title: cleanTitle,
+      author,
+      category,
+      totalQuantity: Number(totalQuantity) || 0,
+      isbn,
+      publishedYear,
+      description,
+      basePrice: Number(basePrice) || 0,
+      bookType: bookType || (req.file ? "Digital" : "Physical"),
+      pdfUrl: req.file ? `/uploads/pdfs/${req.file.filename}` : null
+    };
+
+    const book = new BookCatalog(bookData);
     await book.save();
 
     // ✅ AUDIT LOG
     await Log.create({
       adminEmail: req.admin.email,
       action: "Catalog Entry Created",
-      details: `Added new book title to catalog: "${title}"`
+      details: `Added ${bookData.bookType} book: "${cleanTitle}" (Cost: ${bookData.basePrice})`
     });
 
     res.status(201).json(book);
   } catch (err) {
-    res.status(500).json({ message: "Failed to add book" });
+    console.error("Catalog Add Error:", err);
+    res.status(500).json({ message: "Failed to add book. Ensure 'uploads/pdfs' folder exists." });
   }
 });
 
@@ -52,7 +89,6 @@ router.put("/:id", auth, async (req, res) => {
       { new: true }
     );
 
-    // ✅ AUDIT LOG
     await Log.create({
       adminEmail: req.admin.email,
       action: "Catalog Entry Updated",
@@ -68,7 +104,6 @@ router.put("/:id", auth, async (req, res) => {
 // DELETE book (🔐 Enhanced Security)
 router.post("/delete/:id", auth, async (req, res) => {
   const { email, password } = req.body;
-
   try {
     const admin = await Admin.findOne({ email });
     if (!admin) return res.status(401).json({ message: "Invalid admin email" });
@@ -81,7 +116,6 @@ router.post("/delete/:id", auth, async (req, res) => {
 
     await BookCatalog.findByIdAndDelete(req.params.id);
 
-    // ✅ AUDIT LOG
     await Log.create({
       adminEmail: email,
       action: "Catalog Entry Deleted",

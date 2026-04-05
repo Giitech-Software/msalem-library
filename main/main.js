@@ -13,14 +13,17 @@ function startBackend() {
   let nodeModulesPath;
 
   if (isDev) {
-    // Development: Step out of /main to find /backend
+    // Development: Use standard node_modules
     backendPath = path.join(__dirname, '..', 'backend', 'server.js');
     nodeModulesPath = path.join(__dirname, '..', 'backend', 'node_modules');
   } else {
-    // PRODUCTION: Look in the "resources" folder (outside the ASAR)
+    // PRODUCTION: Look in the "resources" folder
     const resourcesBackend = path.join(process.resourcesPath, 'backend');
     backendPath = path.join(resourcesBackend, 'server.js');
-    nodeModulesPath = path.join(resourcesBackend, 'node_modules');
+    
+    // CRITICAL: We look for 'modules_prod' because we renamed it in package.json
+    // to bypass the electron-builder ignore/signing hang.
+    nodeModulesPath = path.join(resourcesBackend, 'modules_prod');
   }
 
   // --- CRITICAL DIAGNOSTIC CHECK ---
@@ -28,18 +31,18 @@ function startBackend() {
     if (!isDev) {
       dialog.showErrorBox(
         "Backend Error: File Not Found",
-        `Server file missing at: ${backendPath}\n\nPlease ensure 'backend' was included in extraResources.`
+        `Server file missing at: ${backendPath}`
       );
     }
     return;
   }
 
-  // Check if node_modules exists specifically
+  // Check if our renamed dependency folder exists
   if (!fs.existsSync(nodeModulesPath)) {
     if (!isDev) {
       dialog.showErrorBox(
         "Backend Error: Modules Missing",
-        `The 'node_modules' folder is missing at: ${nodeModulesPath}\n\nThe backend cannot start without its dependencies.`
+        `Dependency folder missing at: ${nodeModulesPath}\n\nEnsure 'modules_prod' exists in the resources/backend folder.`
       );
     }
     return;
@@ -49,7 +52,7 @@ function startBackend() {
     env: { 
       ...process.env, 
       NODE_ENV: isDev ? 'development' : 'production',
-      NODE_PATH: nodeModulesPath, // Required for the backend to find its dependencies
+      NODE_PATH: nodeModulesPath, // Essential for finding renamed dependencies
       MONGO_URI: process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/msalem_library'
     },
     cwd: path.dirname(backendPath),
@@ -76,7 +79,6 @@ function createWindow() {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#ffffff',
-    // Dynamic icon path logic
     icon: isDev 
       ? path.join(__dirname, '..', 'app', 'public', 'icon.png') 
       : path.join(__dirname, '..', 'app', 'dist', 'icon.png'),
@@ -89,11 +91,9 @@ function createWindow() {
     },
   });
 
-  // --- 4. DYNAMIC LOADING ---
   if (isDev) {
     win.loadURL('http://localhost:5173');
   } else {
-    // Production: Step out of /main to find /app/dist/index.html
     win.loadFile(path.join(__dirname, '..', 'app', 'dist', 'index.html'));
   }
 
@@ -102,7 +102,6 @@ function createWindow() {
     win.show();
     win.focus();
 
-    // Redraw fix for white screen on some Windows configurations
     setTimeout(() => {
       if (!win.isDestroyed()) {
         const [w, h] = win.getSize();
@@ -113,7 +112,7 @@ function createWindow() {
   });
 }
 
-// --- 5. APP LIFECYCLE ---
+// --- 4. APP LIFECYCLE ---
 app.whenReady().then(() => {
   startBackend(); 
   createWindow();
@@ -124,16 +123,12 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (backendProcess) {
-    backendProcess.kill();
-  }
+  if (backendProcess) backendProcess.kill();
   if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('before-quit', () => {
-  if (backendProcess) {
-    backendProcess.kill();
-  }
+  if (backendProcess) backendProcess.kill();
 });
 
 // Focus fix IPC

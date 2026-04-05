@@ -1,4 +1,3 @@
-// backend/models/BookCatalog.js
 const mongoose = require("mongoose");
 
 const bookCatalogSchema = new mongoose.Schema({
@@ -13,7 +12,6 @@ const bookCatalogSchema = new mongoose.Schema({
   },
   category: { 
     type: String, 
-    // Expanded list to match common school library needs
     enum: {
       values: ["Textbook", "Storybook", "Reference", "Novel", "Periodical", "General"],
       message: '{VALUE} is not a supported category'
@@ -21,13 +19,28 @@ const bookCatalogSchema = new mongoose.Schema({
     required: [true, "Category is required"],
     default: "General"
   },
-  // NEW COLUMN: Total books brought to the library
   totalQuantity: {
     type: Number,
     required: [true, "Total quantity is required"],
     min: [0, "Quantity cannot be negative"],
     default: 1
   },
+  
+  // 🚀 NEW FIELDS FOR DIGITAL & ENTERPRISE UPGRADE
+  bookType: {
+    type: String,
+    enum: ["Physical", "Digital"],
+    default: "Physical"
+  },
+  pdfUrl: {
+    type: String, // Stores the path to the file: /uploads/pdfs/filename.pdf
+    default: null
+  },
+  basePrice: {
+    type: Number, // Stores the borrowing cost for Enterprise tracking
+    default: 0
+  },
+
   isbn: { 
     type: String, 
     trim: true 
@@ -42,7 +55,6 @@ const bookCatalogSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-// Indexing title for faster searching in your "Borrow Book" form
 bookCatalogSchema.index({ title: 'text' });
 
 module.exports = mongoose.model("BookCatalog", bookCatalogSchema);

@@ -1,3 +1,4 @@
+// backend/routes/book.routes.js
 const express = require("express");
 const router = express.Router();
 const Book = require("../models/Book");
@@ -6,6 +7,7 @@ const Log = require("../models/Log");
 const PDFDocument = require("pdfkit");
 const nodemailer = require("nodemailer");
 const auth = require("../middleware/auth"); 
+const path = require("path"); // <-- Added to handle file paths correctly
 
 // --- EMAIL CONFIGURATION ---
 const transporter = nodemailer.createTransport({
@@ -85,8 +87,11 @@ const generateLibraryPDF = async (res, books, config, recipientEmail = null) => 
     const classInfo = `${book.category || ""}${book.subCategory ? ' / ' + book.subCategory : ''}`;
     doc.text(classInfo.substring(0, 24), cols.category, y);
     doc.text(new Date(book.borrowedDate).toLocaleDateString(), cols.out, y);
+    
     if (config.isOverdue) doc.fillColor(primaryColor).font("Helvetica-Bold");
-    doc.text(new Date(book.returnDate).toLocaleDateString(), cols.due, y);
+    const displayDate = book.returnDate ? new Date(book.returnDate).toLocaleDateString() : "N/A (Digital)";
+    doc.text(displayDate, cols.due, y);
+    
     doc.fillColor("#000000").font("Helvetica");
     y += 25;
     if (y > 750) { doc.addPage(); y = 50; }
@@ -108,26 +113,136 @@ router.get("/borrowed", auth, async (req, res) => {
 
 router.post("/borrow", auth, async (req, res) => { 
   try {
-    const existing = await Book.findOne({ borrowerName: req.body.borrowerName, returned: false });
-    if (existing) return res.status(400).json({ message: "This borrower must return their previous book first." });
+    const { bookType, borrowerName, title, deliveryMethod, contact, pdfUrl } = req.body;
+
+    // 1. Validation for Physical Books
+    if (bookType === "Physical") {
+      const existing = await Book.findOne({ borrowerName, returned: false, bookType: "Physical" });
+      if (existing) return res.status(400).json({ message: "Borrower must return previous physical book first." });
+    }
     
-    const bookData = { ...req.body, returned: false };
+    const isDigital = bookType === "Digital";
+
+    // --- NEW: VERIFY FILE EXISTS BEFORE SAVING TO DB ---
+    let filePath = "";
+    if (isDigital && deliveryMethod === "Email") {
+      if (!pdfUrl) {
+        return res.status(400).json({ message: "Digital book has no file attached in catalog." });
+      }
+
+      // Pointing to the CORRECT sub-folder: uploads/pdfs
+      const fileName = path.basename(pdfUrl);
+      filePath = path.resolve(__dirname, "..", "uploads", "pdfs", fileName);
+
+      const fs = require("fs");
+      if (!fs.existsSync(filePath) || fs.lstatSync(filePath).isDirectory()) {
+        console.error(`❌ FILE MISSING OR IS A DIRECTORY: ${filePath}`);
+        return res.status(404).json({ message: "PDF file not found on server. Please re-upload the book." });
+      }
+    }
+
+    // 2. Save to Database
+    const bookData = { 
+      ...req.body, 
+      returned: isDigital, 
+      status: isDigital ? "Dispatched" : "Borrowed",
+      returnDate: isDigital ? undefined : req.body.returnDate,
+      dispatchStatus: isDigital ? "Pending" : "N/A"
+    };
+
     const book = new Book(bookData);
     await book.save();
 
+    // --- 🟢 NEW: WHATSAPP DISPATCH LOGIC ---
+
+
+if (isDigital && deliveryMethod && deliveryMethod.toUpperCase() === "WHATSAPP") {
+    console.log("🎯 WhatsApp Logic Triggered for:", contact);
+    // ... rest of your WA code
+}
+      
+      {
+      // 1. Format the number for Ghana (+233)
+      let cleanNumber = contact.replace(/\D/g, ''); 
+      if (cleanNumber.startsWith('0')) {
+        cleanNumber = '233' + cleanNumber.substring(1);
+      }
+
+      // 2. Create the direct download link
+      const fileName = path.basename(pdfUrl);
+      const downloadUrl = `${req.protocol}://${req.get('host')}/uploads/pdfs/${fileName}`;
+
+      // 3. Create the pre-filled WhatsApp message
+      const message = `Hello ${borrowerName}, here is your digital book: *${title}*.\n\n📥 Download link: ${downloadUrl}`;
+      const encodedMsg = encodeURIComponent(message);
+      
+      const waLink = `https://wa.me/${cleanNumber}?text=${encodedMsg}`;
+
+      await Book.findByIdAndUpdate(book._id, { dispatchStatus: "WA_READY" });
+
+      // Return the waLink so the Frontend can open it
+      return res.status(201).json({ 
+        message: "WhatsApp Link Generated!", 
+        book, 
+        waLink: waLink 
+      });
+    }
+
+    
+    // 3. --- DIGITAL DISPATCH ---
+    if (isDigital && deliveryMethod === "Email" && contact && contact.includes("@")) {
+      const mailOptions = {
+        from: `"M'Salem School Library" <${process.env.EMAIL_USER}>`,
+        to: contact,
+        subject: `📖 Your Digital Book: ${title}`,
+        html: `
+          <div style="font-family: sans-serif; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; max-width: 500px;">
+            <h2 style="color: #15803d;">M'SALEM LIBRARY</h2>
+            <p>Hello <strong>${borrowerName}</strong>,</p>
+            <p>Your requested digital book <strong>"${title}"</strong> is attached below.</p>
+            <hr>
+            <p style="font-size: 11px; color: #666;">Automated Library Dispatch.</p>
+          </div>
+        `,
+        attachments: [{
+          filename: `${title.replace(/\s+/g, '_')}.pdf`,
+          path: filePath,
+          contentType: 'application/pdf'
+        }]
+      };
+
+      try {
+        await transporter.sendMail(mailOptions);
+        await Book.findByIdAndUpdate(book._id, { dispatchStatus: "Sent" });
+        console.log(`✅ Email sent successfully to ${contact}`);
+      } catch (mailError) {
+        console.error("❌ NODEMAILER FAIL:", mailError.message);
+        await Book.findByIdAndUpdate(book._id, { dispatchStatus: "Failed" });
+        // We don't return 500 here because the book IS already saved in DB
+      }
+    }
+
+    // 4. Log Action
     await Log.create({
       adminEmail: req.admin.email,
-      action: "Book Borrowed",
-      details: `Lent "${book.title}" to ${book.borrowerName} (${book.category})`
+      action: isDigital ? "Digital Dispatch" : "Book Borrowed",
+      details: `Sent "${book.title}" to ${book.borrowerName}`
     });
 
-    res.status(201).json({ message: "Book borrowed successfully", book });
-  } catch (error) { res.status(500).json({ message: "Failed to borrow book" }); }
+    res.status(201).json({ 
+      message: isDigital ? "Digital dispatch successful!" : "Book issued successfully", 
+      book 
+    });
+
+  } catch (error) { 
+    console.error("Issuance Error:", error);
+    res.status(500).json({ message: error.message || "Failed to process issuance" }); 
+  }
 });
 
 router.get("/active", async (req, res) => {
   try {
-    const books = await Book.find({ returned: false });
+    const books = await Book.find({ returned: false, bookType: "Physical" });
     res.status(200).json(books);
   } catch (error) { res.status(500).json({ message: "Failed to fetch active books" }); }
 });
@@ -135,12 +250,10 @@ router.get("/active", async (req, res) => {
 router.get("/overdue", async (req, res) => {
   try {
     const today = new Date();
-    const books = await Book.find({ returnDate: { $lt: today }, returned: false });
+    const books = await Book.find({ returnDate: { $lt: today }, returned: false, bookType: "Physical" });
     res.json(books);
   } catch (err) { res.status(500).json({ error: "Failed to fetch overdue books" }); }
 });
-
-// --- REPORT ROUTES ---
 
 router.get("/reports/active-books/pdf", async (req, res) => {
   try {
@@ -158,7 +271,7 @@ router.get("/reports/active-books/pdf", async (req, res) => {
 router.get("/reports/overdue-books/pdf", async (req, res) => {
   try {
     const today = new Date();
-    const books = await Book.find({ returnDate: { $lt: today }, returned: false });
+    const books = await Book.find({ returnDate: { $lt: today }, returned: false, bookType: "Physical" });
     await generateLibraryPDF(res, books, {
       title: "Detailed Overdue Books Report",
       fileName: "overdue-books",
@@ -169,12 +282,11 @@ router.get("/reports/overdue-books/pdf", async (req, res) => {
   }
 });
 
-// --- INDIVIDUAL OVERDUE REMINDER ---
-// ✅ NEW: Professional direct email to the borrower
 router.post("/remind/:id", auth, async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: "Book record not found." });
+    if (book.bookType === "Digital") return res.status(400).json({ message: "Digital books do not require reminders." });
     if (!book.contact || !book.contact.includes("@")) {
       return res.status(400).json({ message: "Borrower does not have a valid email address." });
     }
@@ -193,17 +305,15 @@ router.post("/remind/:id", auth, async (req, res) => {
             <p style="margin: 5px 0;"><strong>Due Date:</strong> ${new Date(book.returnDate).toLocaleDateString()}</p>
             <p style="margin: 5px 0;"><strong>Borrower ID:</strong> ${book.borrowerId}</p>
           </div>
-          <p>Please return the book to the library as soon as possible to avoid any further penalties.</p>
-          <p>If you have already returned this book, please contact the librarian to update our records.</p>
+          <p>Please return the book as soon as possible.</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 12px; color: #666;">This is an automated message from M'Salem School Library Management System.</p>
+          <p style="font-size: 12px; color: #666;">Automated message from M'Salem School Library.</p>
         </div>
       `,
     };
 
     await transporter.sendMail(mailOptions);
 
-    // Log the reminder action
     await Log.create({
       adminEmail: req.admin.email,
       action: "Reminder Sent",
@@ -217,18 +327,14 @@ router.post("/remind/:id", auth, async (req, res) => {
   }
 });
 
-// --- UTILITY ROUTES ---
-
 router.put("/return/:id", auth, async (req, res) => { 
   try {
-    const book = await Book.findByIdAndUpdate(req.params.id, { returned: true }, { new: true });
-    
+    const book = await Book.findByIdAndUpdate(req.params.id, { returned: true, status: "Returned" }, { new: true });
     await Log.create({
       adminEmail: req.admin.email,
       action: "Book Returned",
       details: `Book "${book.title}" was returned by ${book.borrowerName}`
     });
-
     res.status(200).json({ message: "Book marked as returned" });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -240,13 +346,11 @@ router.post("/delete/:id", auth, async (req, res) => {
     if (!admin || !(await admin.comparePassword(password))) {
       return res.status(401).json({ message: "Invalid admin credentials" });
     }
-
     const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: "Book not found" });
 
     const bookTitle = book.title;
     const borrower = book.borrowerName;
-
     await Book.findByIdAndDelete(req.params.id);
 
     await Log.create({
@@ -254,7 +358,6 @@ router.post("/delete/:id", auth, async (req, res) => {
       action: "Book Deletion",
       details: `CRITICAL: Deleted record for "${bookTitle}" previously held by ${borrower}`
     });
-
     res.status(200).json({ message: "Book deleted successfully" });
   } catch (error) { res.status(500).json({ message: "Delete failed" }); }
 });
