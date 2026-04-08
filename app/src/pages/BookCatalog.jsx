@@ -100,7 +100,6 @@ const BookCatalog = () => {
     <div className="p-8 bg-yellow-50 min-h-screen border-2 border-yellow-200 relative font-sans">
       <BackButton label="⬅ Return to Dashboard" />
       
-      {/* Header and Search Field Container */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h1 className="text-3xl font-black text-green-700 uppercase tracking-tighter italic">
           📘 Live Inventory Management
@@ -122,7 +121,8 @@ const BookCatalog = () => {
           <thead>
             <tr className="bg-green-700 text-yellow-300 uppercase text-xs tracking-widest">
               <th className="py-2 px-4">Book Information</th>
-              <th className="py-2 px-4">Category</th>
+              <th className="py-2 px-4">Category & Format</th>
+              <th className="py-2 px-4 text-center">Avg. Fee</th>
               <th className="py-2 px-4 text-center">Live Stock</th>
               <th className="py-2 px-4 text-center">Status</th>
               <th className="py-2 px-4 text-right">Actions</th>
@@ -138,6 +138,7 @@ const BookCatalog = () => {
                 
                 const total = book.totalQuantity || 0;
                 const available = total - borrowedCount;
+                const isDigital = book.bookType === 'Digital';
 
                 return (
                   <tr key={book._id} className="hover:bg-yellow-50/30 transition-colors">
@@ -148,16 +149,24 @@ const BookCatalog = () => {
                           <input name="author" value={editForm.author} onChange={handleEditChange} className="border-2 p-1 rounded-lg w-full text-xs outline-none" />
                         </td>
                         <td className="py-0.5 px-4">
-                          <select name="category" value={editForm.category} onChange={handleEditChange} className="border-2 p-1 rounded-lg w-full text-xs font-bold">
+                          <select name="category" value={editForm.category} onChange={handleEditChange} className="border-2 p-1 rounded-lg w-full text-xs font-bold mb-1">
                             <option value="Textbook">Textbook</option>
                             <option value="Storybook">Storybook</option>
                             <option value="Reference">Reference</option>
                             <option value="Novel">Novel</option>
                             <option value="General">General</option>
                           </select>
+                          <select name="bookType" value={editForm.bookType} onChange={handleEditChange} className="border-2 p-1 rounded-lg w-full text-[10px] font-black uppercase">
+                            <option value="Physical">Physical</option>
+                            <option value="Digital">Digital</option>
+                          </select>
                         </td>
                         <td className="py-0.5 px-4 text-center">
-                          <input type="number" name="totalQuantity" value={editForm.totalQuantity} onChange={handleEditChange} className="border-2 p-1 rounded-lg w-16 text-center font-bold text-sm" />
+                          <input type="number" name="basePrice" value={editForm.basePrice} onChange={handleEditChange} className="border-2 p-1 rounded-lg w-16 text-center font-bold text-sm" />
+                        </td>
+                        <td className="py-0.5 px-4 text-center">
+                          {!isDigital && <input type="number" name="totalQuantity" value={editForm.totalQuantity} onChange={handleEditChange} className="border-2 p-1 rounded-lg w-16 text-center font-bold text-sm" />}
+                          {isDigital && <span className="text-gray-300 italic text-xs">Unlimited</span>}
                         </td>
                         <td colSpan="2" className="py-0.5 px-4 text-right">
                           <button onClick={handleEditSubmit} className="bg-green-600 text-white py-1.5 px-4 rounded-lg font-black text-[10px] uppercase hover:bg-green-700 shadow-sm active:scale-95 transition-all mr-2">Save</button>
@@ -171,20 +180,28 @@ const BookCatalog = () => {
                           <p className="text-[11px] text-gray-400 mt-0.5 font-bold uppercase tracking-wide">{book.author || "No Author"}</p>
                         </td>
                         <td className="py-0.5 px-4">
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] rounded-md font-black uppercase">
-                            {book.category}
-                          </span>
-                        </td>
-                        <td className="py-0.5 px-4 text-center">
-                          <div className="flex flex-col items-center">
-                            <span className={`text-base font-black ${available <= 0 ? 'text-red-600 animate-pulse' : 'text-green-700'}`}>
-                              {available < 0 ? 0 : available}
+                          <div className="flex flex-col gap-1">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] rounded-md font-black uppercase w-fit">
+                              {book.category}
                             </span>
-                            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">of {total}</span>
+                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase w-fit ${isDigital ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                              {book.bookType || 'Physical'}
+                            </span>
                           </div>
                         </td>
                         <td className="py-0.5 px-4 text-center">
-                          {available <= 0 ? (
+                            <span className="text-sm font-black text-green-600">${book.basePrice || 0}</span>
+                        </td>
+                        <td className="py-0.5 px-4 text-center">
+                          <div className="flex flex-col items-center">
+                            <span className={`text-base font-black ${!isDigital && available <= 0 ? 'text-red-600 animate-pulse' : 'text-green-700'}`}>
+                              {isDigital ? "∞" : (available < 0 ? 0 : available)}
+                            </span>
+                            {!isDigital && <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">of {total}</span>}
+                          </div>
+                        </td>
+                        <td className="py-0.5 px-4 text-center">
+                          {(!isDigital && available <= 0) ? (
                             <span className="bg-red-600 text-white text-[9px] px-2 py-0.5 rounded-full font-black shadow-sm">OUT</span>
                           ) : (
                             <span className="bg-green-100 text-green-700 text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter border border-green-200">IN</span>
@@ -211,7 +228,7 @@ const BookCatalog = () => {
               })
             ) : (
               <tr>
-                <td colSpan="5" className="text-center py-10 text-gray-300 font-black uppercase tracking-widest italic">
+                <td colSpan="6" className="text-center py-10 text-gray-300 font-black uppercase tracking-widest italic">
                   No Catalog Matches Found
                 </td>
               </tr>

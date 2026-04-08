@@ -68,7 +68,6 @@ const ArchivedBooks = () => {
     <div className="p-8 bg-yellow-50 min-h-screen border-2 border-yellow-200 relative font-sans">
       <BackButton label="⬅ Return to Dashboard" />
       
-      {/* Updated Header and Search Container */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h1 className="text-3xl font-black text-green-700 uppercase tracking-tight italic">
           🗂️📕 Archived Records
@@ -77,7 +76,7 @@ const ArchivedBooks = () => {
         <div className="w-full max-w-xs">
           <input
             type="text"
-            placeholder="Search archives..."
+            placeholder="Search archives by Title or ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full border-2 border-green-200 p-2 rounded-xl focus:border-green-600 outline-none shadow-sm font-bold text-sm"
@@ -90,44 +89,69 @@ const ArchivedBooks = () => {
           <thead>
             <tr className="bg-gray-800 text-yellow-400 uppercase text-xs tracking-widest">
               <th className="py-2 px-4 border-b border-gray-900">Borrower ID</th>
-              <th className="py-2 px-4 border-b border-gray-900">Book Title</th>
+              <th className="py-2 px-4 border-b border-gray-900">Item Details</th>
               <th className="py-2 px-4 border-b border-gray-900">Borrower Name</th>
-              <th className="py-2 px-4 border-b border-gray-900">Category</th>
+              <th className="py-2 px-4 border-b border-gray-900 text-center">Final Fee</th>
               <th className="py-2 px-4 border-b border-gray-900">Timeline</th>
               <th className="py-2 px-4 border-b border-gray-900 text-center">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filteredBooks.map((book) => (
-              <tr key={book._id} className="hover:bg-gray-50 transition-colors">
-                <td className="py-0.5 px-4">
-                  <span className="text-[11px] font-black text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-                    {book.borrowerId || "NO-ID"}
-                  </span>
-                </td>
-                <td className="py-0.5 px-4 font-black text-gray-800 text-sm">{book.title}</td>
-                <td className="py-0.5 px-4 font-bold text-gray-700 text-sm">{book.borrowerName}</td>
-                <td className="py-0.5 px-4 text-[10px] font-bold text-gray-400 uppercase leading-tight">
-                  {book.category} <br/> {book.subCategory}
-                </td>
-                <td className="py-0.5 px-4 text-[11px] font-bold text-gray-500">
-                  <div className="flex flex-col">
-                    <span>Borrowed: {new Date(book.borrowedDate).toLocaleDateString()}</span>
-                    <span className="text-green-600">Returned: {new Date(book.returnDate).toLocaleDateString()}</span>
-                  </div>
-                </td>
-                <td className="py-0.5 px-4 text-center">
-                  <button
-                    onClick={() => openDeleteModal(book._id)}
-                    className="bg-red-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] hover:bg-red-700 transition-all uppercase shadow-sm active:scale-95 tracking-tighter"
-                  >
-                    Delete Permanently
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {filteredBooks.map((book) => {
+              const isDigital = book.bookType === 'Digital';
+              return (
+                <tr key={book._id} className="hover:bg-gray-50 transition-colors">
+                  <td className="py-0.5 px-4">
+                    <span className="text-[11px] font-black text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                      {book.borrowerId || "NO-ID"}
+                    </span>
+                  </td>
+                  <td className="py-0.5 px-4">
+                    <div className="font-black text-gray-800 text-sm uppercase leading-tight">{book.title}</div>
+                    <div className="flex gap-2 mt-1">
+                      <span className="text-[9px] font-bold text-gray-400 uppercase">{book.category}</span>
+                      <span className={`text-[8px] font-black px-1.5 rounded uppercase ${isDigital ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {book.bookType || 'Physical'}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-0.5 px-4 font-bold text-gray-700 text-sm">{book.borrowerName}</td>
+                  <td className="py-0.5 px-4 text-center">
+  {/* CHANGE book.basePrice TO book.borrowingCost */}
+  <span className="text-sm font-black text-green-700">
+    ${book.borrowingCost || 0}
+  </span>
+</td>
+                  <td className="py-0.5 px-4 text-[11px] font-bold text-gray-500">
+                    <div className="flex flex-col">
+                      <span>Borrowed: {new Date(book.borrowedDate).toLocaleDateString()}</span>
+                      <span className="text-green-600">
+                        {isDigital ? "Access Logged" : `Returned: ${new Date(book.returnDate).toLocaleDateString()}`}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-0.5 px-4 text-center">
+                    <button
+                      onClick={() => openDeleteModal(book._id)}
+                      className="bg-red-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] hover:bg-red-700 transition-all uppercase shadow-sm active:scale-95 tracking-tighter"
+                    >
+                      Delete Permanently
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+        <div className="p-3 bg-gray-50 rounded-b-xl flex justify-between items-center">
+            <p className="text-gray-500 font-black text-[10px] uppercase">
+              Total Archived Records: {filteredBooks.length}
+            </p>
+            <p className="text-green-700 font-black text-[10px] uppercase">
+  {/* CHANGE b.basePrice TO b.borrowingCost */}
+  Historical Revenue: ${filteredBooks.reduce((sum, b) => sum + (b.borrowingCost || 0), 0)}
+</p>
+        </div>
       </div>
 
       {/* --- Delete Confirmation Modal --- */}

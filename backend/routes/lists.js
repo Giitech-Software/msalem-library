@@ -1,7 +1,9 @@
+//backend/routes/lists.js
 const express = require("express");
 const router = express.Router();
 const Student = require("../models/Student");
 const Staff = require("../models/Staff");
+const GeneralUser = require("../models/GeneralUser");
 const ArchivedStudent = require("../models/ArchivedStudent");
 const Log = require("../models/Log");
 const auth = require("../middleware/auth");
@@ -237,4 +239,58 @@ router.delete("/staff/:id", auth, async (req, res) => {
   }
 });
 
+// --- GENERAL USER ROUTES ---
+
+// GET all general users
+router.get("/general", async (req, res) => {
+  try {
+    const users = await GeneralUser.find().sort({ name: 1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch general users" });
+  }
+});
+
+// BULK INSERT general users
+router.post("/general/bulk", auth, async (req, res) => {
+  const { names, subCategory } = req.body;
+  if (!names || !Array.isArray(names)) return res.status(400).json({ message: "Invalid names list" });
+
+  try {
+    const userDocs = names.map(name => ({ name, subCategory }));
+    await GeneralUser.insertMany(userDocs, { ordered: false });
+
+    await Log.create({
+      adminEmail: req.admin.email,
+      action: "General User Bulk Import",
+      details: `Imported ${names.length} general users into ${subCategory}`
+    });
+
+    res.status(201).json({ message: "Import successful" });
+  } catch (err) {
+    if (err.code === 11000) return res.status(201).json({ message: "Import completed (Duplicates skipped)" });
+    res.status(500).json({ message: "Bulk import failed" });
+  }
+});
+
+// UPDATE general user
+router.put("/general/:id", auth, async (req, res) => {
+  try {
+    const { name } = req.body;
+    const updated = await GeneralUser.findByIdAndUpdate(req.params.id, { name }, { new: true });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: "Update failed" });
+  }
+});
+
+// DELETE general user
+router.delete("/general/:id", auth, async (req, res) => {
+  try {
+    await GeneralUser.findByIdAndDelete(req.params.id);
+    res.json({ message: "User removed" });
+  } catch (err) {
+    res.status(500).json({ message: "Delete failed" });
+  }
+});
 module.exports = router;

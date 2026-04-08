@@ -9,7 +9,7 @@ const BorrowBook = () => {
   const [students, setStudents] = useState([]);
   const [staff, setStaff] = useState([]);
   const [borrowedRecords, setBorrowedRecords] = useState([]); 
-  
+  const [generalUsers, setGeneralUsers] = useState([]); 
   const [filteredTitles, setFilteredTitles] = useState([]);
   const [filteredNames, setFilteredNames] = useState([]);
   
@@ -18,7 +18,7 @@ const BorrowBook = () => {
 
   const today = new Date().toISOString().split('T')[0];
 
- const initialFormState = {
+  const initialFormState = {
     title: "",
     borrowerName: "",
     borrowerId: "", 
@@ -29,8 +29,8 @@ const BorrowBook = () => {
     contact: "", 
     bookType: "Physical",
     basePrice: 0,
-    deliveryMethod: "WhatsApp",
-    pdfUrl: "", // <--- ADD THIS LINE
+    deliveryMethod: "Email", 
+    pdfUrl: "", 
   };
 
   const [form, setForm] = useState(initialFormState);
@@ -41,6 +41,7 @@ const BorrowBook = () => {
     "Upper Primary": ["B4", "B5", "B6"],
     JHS: ["JHS1", "JHS2", "JHS3"],
     SHS: ["SHS1", "SHS2", "SHS3"],
+    Tertiary: ["Level 100", "Level 200", "Level 300", "Level 400", "Post-Graduate"],
     Staff: ["Teaching", "Non-Teaching", "Management"],
     "General User": ["Community Member", "Parent", "Visitor", "Alumni"], 
   };
@@ -52,19 +53,21 @@ const BorrowBook = () => {
 
   useEffect(() => {
     const loadAllData = async () => {
-      try {
+     try {
         const config = getAuthHeaders();
-        const [catRes, stdRes, stfRes, borrowRes] = await Promise.allSettled([
+        const [catRes, stdRes, stfRes, borrowRes, gnrRes] = await Promise.allSettled([
           axios.get("http://localhost:5000/api/bookCatalog", config),
           axios.get("http://localhost:5000/api/students", config),
           axios.get("http://localhost:5000/api/staff", config),
-          axios.get("http://localhost:5000/api/books/borrowed", config) 
+          axios.get("http://localhost:5000/api/books/borrowed", config),
+          axios.get("http://localhost:5000/api/general", config) 
         ]);
 
         if (catRes.status === 'fulfilled') setCatalog(catRes.value.data || []);
         if (stdRes.status === 'fulfilled') setStudents(stdRes.value.data || []);
         if (stfRes.status === 'fulfilled') setStaff(stfRes.value.data || []);
         if (borrowRes.status === 'fulfilled') setBorrowedRecords(borrowRes.value.data || []);
+        if (gnrRes.status === 'fulfilled') setGeneralUsers(gnrRes.value.data || []); 
       } catch (err) {
         console.error("Data load error:", err);
       }
@@ -119,21 +122,24 @@ const BorrowBook = () => {
       const search = value.toLowerCase();
       const combined = [
         ...(students || []).map(s => ({ ...s, type: 'Student' })),
-        ...(staff || []).map(s => ({ ...s, type: 'Staff' }))
+        ...(staff || []).map(s => ({ ...s, type: 'Staff' })),
+        ...(generalUsers || []).map(u => ({ ...u, type: 'General User' }))
       ];
-      const matches = combined.filter((p) => p.name && p.name.toLowerCase().includes(search)).slice(0, 5);
+      const matches = combined
+        .filter((p) => p.name && p.name.toLowerCase().includes(search))
+        .slice(0, 5);
       setFilteredNames(value ? matches : []);
     }
   };
 
-const handleSelectBook = (b) => {
+  const handleSelectBook = (b) => {
     const actualType = (b.bookType === "Digital" || b.pdfUrl) ? "Digital" : "Physical";
     setForm(prev => ({
       ...prev,
       title: b.title,
       bookType: actualType,
       basePrice: b.basePrice || 0,
-      pdfUrl: b.pdfUrl || "", // <--- ADD THIS LINE
+      pdfUrl: b.pdfUrl || "", 
       returnDate: actualType === "Digital" ? "" : prev.returnDate
     }));
     setFilteredTitles([]);
@@ -144,11 +150,18 @@ const handleSelectBook = (b) => {
       ...prev,
       borrowerName: person.name,
       borrowerId: person.studentId || person.staffId || person.borrowerId || "",
-      category: person.type === 'Staff' ? 'Staff' : (person.category || "General User"),
+      category: person.type === 'Staff' ? 'Staff' : (person.type === 'Student' ? person.category : 'General User'),
       subCategory: person.subCategory || "",
       contact: person.contact || person.phone || person.email || "" 
     }));
     setFilteredNames([]);
+  };
+
+  const resetToOriginalPrice = () => {
+    const original = catalog.find(b => b.title === form.title);
+    if (original) {
+        setForm(prev => ({ ...prev, basePrice: original.basePrice }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -158,26 +171,32 @@ const handleSelectBook = (b) => {
         return;
     }
 
+    if (form.bookType === "Digital") {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!form.contact || !emailRegex.test(form.contact)) {
+        setStatus({ 
+          show: true, 
+          message: "A valid Email is required for Digital dispatch!", 
+          type: "error" 
+        });
+        return;
+      }
+    }
+
     const payload = {
       ...form,
+      borrowingCost: Number(form.basePrice) || 0, 
       status: form.bookType === "Digital" ? "Dispatched" : "Borrowed",
       returnDate: form.bookType === "Digital" ? null : form.returnDate
     };
 
     try {
-      // 🟢 FIX 1: Capture the response in 'res'
       const res = await axios.post("http://localhost:5000/api/books/borrow", payload, getAuthHeaders());
       
-      // 🟢 FIX 2: Now 'res' is defined, so we can check for waLink
-      if (form.bookType === "Digital" && form.deliveryMethod === "WhatsApp" && res.data?.waLink) {
-        window.open(res.data.waLink, "_blank"); 
-      }
-
       setForm(initialFormState);
       setFilteredTitles([]);
       setFilteredNames([]);
       
-      // 🟢 FIX 3: Use the message from the backend response if it exists
       setStatus({ 
         show: true, 
         message: res.data?.message || (form.bookType === "Digital" ? "Digital Access Dispatched!" : "Book issued successfully!"), 
@@ -187,7 +206,6 @@ const handleSelectBook = (b) => {
       setSubmitCount(prev => prev + 1);
       setTimeout(() => setStatus({ show: false }), 4000);
     } catch (error) {
-      // If the code reaches here, axios actually failed
       const msg = error.response?.data?.message || "Error processing request.";
       setStatus({ show: true, message: msg, type: "error" });
     }
@@ -198,18 +216,20 @@ const handleSelectBook = (b) => {
       <BackButton label="⬅ Return to Dashboard" />
       
       {status.show && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-2xl flex items-center gap-4 animate-bounce ${
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-2xl animate-bounce ${
           status.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
         }`}>
-          <span className="font-bold">{status.message}</span>
-          <button onClick={() => setStatus({ show: false })} className="bg-white bg-opacity-20 hover:bg-opacity-40 rounded-full h-6 w-6 flex items-center justify-center text-xs font-black">✕</button>
+          <div className="flex items-center gap-3">
+            <span className="font-bold">{status.message}</span>
+            <button onClick={() => setStatus({show: false})} className="ml-2 hover:opacity-70">✕</button>
+          </div>
         </div>
       )}
 
       <h1 className="text-3xl font-black text-green-700 mb-6 text-center uppercase tracking-tight italic underline decoration-yellow-400">📖 Smart Issuance Portal</h1>
       
-      <form key={submitCount} onSubmit={handleSubmit} className="bg-white shadow-2xl rounded-3xl p-8 max-w-xl mx-auto border-t-8 border-green-700">
-        <div className="grid gap-5">
+      <form key={submitCount} onSubmit={handleSubmit} className="bg-white shadow-2xl rounded-3xl p-6 max-w-xl mx-auto border-t-8 border-green-700">
+        <div className="grid gap-3">
           
           <div className="relative">
             <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Live Book Inventory</label>
@@ -218,10 +238,10 @@ const handleSelectBook = (b) => {
             {form.title && (
               <div className="mt-1 flex gap-2">
                  <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase ${form.bookType === 'Digital' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                   Mode: {form.bookType}
+                    Mode: {form.bookType}
                  </span>
                  <span className="text-[9px] font-black px-2 py-0.5 rounded bg-yellow-400 text-green-900 uppercase">
-                   Cost: ${form.basePrice}
+                    Original Price: ${catalog.find(b => b.title === form.title)?.basePrice || 0}
                  </span>
               </div>
             )}
@@ -254,20 +274,68 @@ const handleSelectBook = (b) => {
 
           <hr className="border-dashed border-gray-100" />
 
+          <div className="bg-yellow-50 p-2 rounded-2xl border-2 border-yellow-100 flex items-center justify-between">
+            <div className="flex-1">
+              <label className="text-[10px] font-black text-yellow-700 uppercase tracking-widest ml-1 block mb-1">Adjust Issuance Price</label>
+              <div className="relative max-w-37.5">
+                <span className="absolute left-3 top-2 font-bold text-gray-500">$</span>
+                <input 
+                  type="number" 
+                  name="basePrice" 
+                  value={form.basePrice} 
+                  onChange={handleChange} 
+                  className="w-full border-2 pl-7 pr-2 py-1.5 rounded-xl border-yellow-300 focus:border-green-600 outline-none font-black text-green-700"
+                />
+              </div>
+            </div>
+            <div className="text-right">
+                <button type="button" onClick={resetToOriginalPrice} className="text-[9px] font-black bg-white border border-yellow-300 text-yellow-700 px-2 py-1 rounded-lg hover:bg-yellow-100 transition uppercase">
+                    ↺ Reset Price
+                </button>
+                <p className="text-[8px] text-yellow-600 font-bold mt-1 uppercase italic">* Set to 0 for free school issuance</p>
+            </div>
+          </div>
+
           <div className="relative">
             <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Borrower Name</label>
             <input name="borrowerName" value={form.borrowerName} onChange={handleChange} required autoComplete="off" placeholder="Search name..." className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none font-bold" />
             {filteredNames.length > 0 && (
               <div className="absolute z-30 bg-white border-2 border-green-100 w-full rounded-2xl shadow-2xl mt-1">
-                {filteredNames.map(p => (
-                  <div key={p._id} className="p-3 hover:bg-green-50 cursor-pointer border-b flex justify-between items-center" onClick={() => handleSelectPerson(p)}>
-                    <span className="font-bold text-gray-800">{p.name}</span>
-                    <div className="flex gap-2">
-                        <span className="text-[8px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-bold italic">{p.studentId || p.staffId}</span>
-                        <span className="text-[9px] bg-green-700 text-white px-2 py-1 rounded-md uppercase font-black">{p.type}</span>
+              {filteredNames.map(p => (
+                <div 
+                  key={p._id} 
+                  className="p-3 hover:bg-green-50 cursor-pointer border-b last:border-0 flex justify-between items-center transition-colors" 
+                  onClick={() => handleSelectPerson(p)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm ${
+                      p.type === 'Student' ? 'bg-yellow-100' : 
+                      p.type === 'Staff' ? 'bg-green-100' : 'bg-blue-100'
+                    }`}>
+                      {p.type === 'Student' ? '🎓' : p.type === 'Staff' ? '👔' : '🌍'}
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <span className="font-bold text-gray-800 leading-none">{p.name}</span>
+                      <span className="text-[9px] text-gray-500 font-medium mt-1 uppercase">
+                        {p.subCategory || p.type}
+                      </span>
                     </div>
                   </div>
-                ))}
+
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`text-[8px] px-2 py-0.5 rounded-md font-black uppercase tracking-widest ${
+                      p.type === 'Student' ? 'bg-yellow-400 text-green-900' : 
+                      p.type === 'Staff' ? 'bg-green-700 text-white' : 'bg-blue-600 text-white'
+                    }`}>
+                      {p.type}
+                    </span>
+                    <span className="text-[9px] text-gray-400 font-mono italic">
+                      {p.studentId || p.staffId || p.borrowerId || "NO ID"}
+                    </span>
+                  </div>
+                </div>
+              ))}
               </div>
             )}
           </div>
@@ -283,26 +351,18 @@ const handleSelectBook = (b) => {
 
               <div>
                 <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">
-                  {form.bookType === 'Digital' ? `Send via ${form.deliveryMethod}` : "Contact Info"}
+                  Contact Info {form.bookType === 'Digital' && <span className="text-red-500">*</span>}
                 </label>
-                <input name="contact" value={form.contact} onChange={handleChange} placeholder={form.bookType === 'Digital' ? "Number or Email" : "Phone/Email"} className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none font-bold" />
+                <input 
+                  name="contact" 
+                  value={form.contact} 
+                  onChange={handleChange} 
+                  required={form.bookType === 'Digital'}
+                  placeholder={form.bookType === 'Digital' ? "Enter Email Address" : "Phone/Email"} 
+                  className={`w-full border-2 p-2 rounded-xl outline-none font-bold ${form.bookType === 'Digital' && !form.contact ? 'border-red-300 bg-red-50' : 'focus:border-green-600'}`} 
+                />
               </div>
           </div>
-
-          {/* DIGITAL DELIVERY METHOD SELECTOR */}
-          {form.bookType === 'Digital' && (
-            <div className="bg-blue-50 p-3 rounded-2xl border-2 border-blue-100 flex items-center justify-between">
-              <span className="text-[10px] font-black text-blue-700 uppercase ml-1">Dispatch Via:</span>
-              <div className="flex gap-3">
-                {['WhatsApp', 'Email'].map(method => (
-                  <button key={method} type="button" onClick={() => setForm(prev => ({...prev, deliveryMethod: method}))} 
-                    className={`px-3 py-1 rounded-lg text-[10px] font-black transition ${form.deliveryMethod === method ? 'bg-blue-600 text-white' : 'bg-white text-blue-600 border border-blue-200'}`}>
-                    {method.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -327,7 +387,6 @@ const handleSelectBook = (b) => {
               <input type="date" name="borrowedDate" value={form.borrowedDate} max={today} onChange={handleChange} required className="w-full border-2 p-2 rounded-xl font-bold text-gray-700" />
             </div>
             
-            {/* HIDE RETURN DATE IF DIGITAL */}
             <div className={form.bookType === 'Digital' ? 'opacity-30 pointer-events-none' : ''}>
               <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">
                 {form.bookType === 'Digital' ? "No Return Needed" : "Expected Return"}
@@ -337,7 +396,7 @@ const handleSelectBook = (b) => {
           </div>
 
           <button type="submit" className={`py-3 rounded-xl font-black text-lg transition shadow-lg mt-2 uppercase tracking-tighter ${form.bookType === 'Digital' ? 'bg-blue-700 text-white hover:bg-blue-800' : 'bg-green-700 text-yellow-300 hover:bg-green-800'}`}>
-            {form.bookType === 'Digital' ? `🚀 Dispatch to ${form.deliveryMethod}` : "Confirm Physical Issuance"}
+            {form.bookType === 'Digital' ? "🚀 Dispatch via Email" : "Confirm Physical Issuance"}
           </button>
         </div>
       </form>

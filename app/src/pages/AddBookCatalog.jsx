@@ -19,7 +19,7 @@ const AddBookCatalog = () => {
     isbn: "",
     publishedYear: "",
     description: "",
-    basePrice: "0", // ✅ NEW: Enterprise Borrowing Cost
+    basePrice: "0", 
   };
   
   const [form, setForm] = useState(initialFormState);
@@ -30,10 +30,16 @@ const AddBookCatalog = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Basic validation for Title since it's the primary identifier
+    if (!form.title) {
+        setStatus({ show: true, message: "Book Title is required to identify the entry.", type: "error" });
+        return;
+    }
+
     const token = localStorage.getItem("token");
 
     try {
-      // 1. Existing Duplicate Check Logic
       const existing = await axios.get(
         `http://localhost:5000/api/bookCatalog/search?title=${encodeURIComponent(form.title)}`
       );
@@ -43,29 +49,24 @@ const AddBookCatalog = () => {
         return;
       }
 
-      // 2. Hybrid Payload Logic (Maintains existing functionality)
       let payload;
       let config = {
         headers: { Authorization: `Bearer ${token}` }
       };
 
       if (pdfFile) {
-        // DIGITAL MODE: Use FormData for files
         payload = new FormData();
         Object.keys(form).forEach(key => payload.append(key, form[key]));
         payload.append("pdf", pdfFile);
         payload.append("bookType", "Digital");
-        payload.set("totalQuantity", "999999"); // Infinite stock for PDFs
+        payload.set("totalQuantity", "999999"); 
         config.headers["Content-Type"] = "multipart/form-data";
       } else {
-        // PHYSICAL MODE: Sends exact JSON structure as your current working code
         payload = { ...form, bookType: "Physical" };
       }
 
-      // 3. Post to backend
       await axios.post("http://localhost:5000/api/bookCatalog/add", payload, config);
 
-      // Reset Form & Refresh Session
       setForm(initialFormState);
       setPdfFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -110,15 +111,50 @@ const AddBookCatalog = () => {
         <div className="grid gap-4">
           <div>
             <label className="text-xs font-bold text-gray-600 uppercase">Book Title</label>
-            <input name="title" value={form.title} onChange={handleChange} required className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none" />
+            <input 
+                name="title" 
+                value={form.title} 
+                onChange={handleChange} 
+                placeholder="eg. The Adventures of Sherlock Holmes"
+                className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none" 
+            />
           </div>
 
           <div>
             <label className="text-xs font-bold text-gray-600 uppercase">Author</label>
-            <input name="author" value={form.author} onChange={handleChange} required className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none" />
+            <input 
+                name="author" 
+                value={form.author} 
+                onChange={handleChange} 
+                placeholder="eg. Arthur Conan Doyle"
+                className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none" 
+            />
           </div>
 
-          {/* 📂 NEW: PDF UPLOAD SECTION */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-gray-600 uppercase">ISBN (Optional)</label>
+              <input 
+                name="isbn" 
+                value={form.isbn} 
+                onChange={handleChange} 
+                placeholder="eg. 978-3-16..."
+                className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none" 
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-600 uppercase">Published Year</label>
+              <input 
+                type="number" 
+                name="publishedYear" 
+                value={form.publishedYear} 
+                onChange={handleChange} 
+                placeholder="eg. 2024"
+                className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none" 
+              />
+            </div>
+          </div>
+
           <div className="p-4 border-2 border-dashed border-blue-200 bg-blue-50 rounded-xl">
             <label className="text-xs font-black text-blue-700 uppercase block mb-1">
               Digital Copy (Optional PDF)
@@ -135,7 +171,7 @@ const AddBookCatalog = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold text-gray-600 uppercase">Category</label>
-              <select name="category" value={form.category} onChange={handleChange} required className="w-full border-2 p-2 rounded-xl bg-white">
+              <select name="category" value={form.category} onChange={handleChange} className="w-full border-2 p-2 rounded-xl bg-white">
                 <option value="">Select...</option>
                 <option value="Textbook">Textbook</option>
                 <option value="Storybook">Storybook</option>
@@ -146,14 +182,41 @@ const AddBookCatalog = () => {
             </div>
             <div>
               <label className="text-xs font-bold text-blue-600 uppercase italic">Borrowing Cost ($)</label>
-              <input type="number" name="basePrice" value={form.basePrice} onChange={handleChange} className="w-full border-2 border-blue-100 p-2 rounded-xl font-bold focus:border-blue-500 outline-none" />
+              <input 
+                type="number" 
+                name="basePrice" 
+                value={form.basePrice} 
+                onChange={handleChange} 
+                placeholder="0.00"
+                className="w-full border-2 border-blue-100 p-2 rounded-xl font-bold focus:border-blue-500 outline-none" 
+              />
             </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-600 uppercase">Description</label>
+            <textarea 
+                name="description" 
+                value={form.description} 
+                onChange={handleChange} 
+                rows="3" 
+                className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none resize-none" 
+                placeholder="eg. A classic collection of detective stories..."
+            ></textarea>
           </div>
 
           {!pdfFile && (
             <div>
               <label className="text-xs font-bold text-gray-600 uppercase">Physical Quantity</label>
-              <input type="number" name="totalQuantity" value={form.totalQuantity} onChange={handleChange} required={!pdfFile} min="1" className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none" />
+              <input 
+                type="number" 
+                name="totalQuantity" 
+                value={form.totalQuantity} 
+                onChange={handleChange} 
+                min="1" 
+                placeholder="eg. 10"
+                className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none" 
+              />
             </div>
           )}
 

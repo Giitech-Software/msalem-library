@@ -16,9 +16,10 @@ import OverdueBooks from "./pages/OverdueBooks";
 import StudentList from "./pages/StudentList";
 import StaffList from "./pages/StaffList";
 import AdminManagement from "./pages/AdminManagement"; 
-
-// ✅ New Page - Ensure this file exists at /src/pages/SecurityLogs.jsx
 import SecurityLogs from "./pages/SecurityLogs"; 
+
+// ✅ New Page Import
+import GeneralUserList from "./pages/GeneralUserList"; 
 
 const AppRoutes = () => {
   return (
@@ -36,10 +37,15 @@ const AppRoutes = () => {
       <Route path="/statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
       <Route path="/overdue" element={<ProtectedRoute><OverdueBooks /></ProtectedRoute>} />
       <Route path="/book-catalog" element={<ProtectedRoute><BookCatalog /></ProtectedRoute>} />
+      
+      {/* People Management */}
       <Route path="/students" element={<ProtectedRoute><StudentList /></ProtectedRoute>} />
       <Route path="/staff" element={<ProtectedRoute><StaffList /></ProtectedRoute>} />
+      
+      {/* ✅ New Route for Community/General Users */}
+      <Route path="/general-users" element={<ProtectedRoute><GeneralUserList /></ProtectedRoute>} />
 
-      {/* ✅ Superadmin ONLY Pages */}
+      {/* Superadmin ONLY Pages */}
       <Route 
         path="/admin-management" 
         element={

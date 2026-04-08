@@ -48,7 +48,7 @@ const ActiveBorrowedBooks = () => {
         headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }
       });
       setStatus({ show: true, message: "Book marked as returned!", type: "success" });
-      setConfirmModal({ show: false, id: null }); // Close modal
+      setConfirmModal({ show: false, id: null }); 
       fetchBooks();
       setTimeout(() => setStatus({ show: false }), 3000);
     } catch (error) {
@@ -135,7 +135,6 @@ const ActiveBorrowedBooks = () => {
     <div className="p-8 bg-yellow-50 min-h-screen border-2 border-yellow-200 font-sans">
       <BackButton label="⬅ Return to Dashboard" />
       
-      {/* Non-blocking Confirm Modal */}
       {confirmModal.show && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-100 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border-4 border-green-600 animate-in zoom-in duration-200">
@@ -167,7 +166,6 @@ const ActiveBorrowedBooks = () => {
         </div>
       )}
 
-      {/* Aligned Header Row */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <h1 className="text-3xl font-black text-green-700 uppercase tracking-tight italic whitespace-nowrap">
           📖✅ Active Borrowed Books
@@ -207,6 +205,7 @@ const ActiveBorrowedBooks = () => {
               <th className="py-2 px-4 border-b border-green-800">Borrower ID</th>
               <th className="py-2 px-4 border-b border-green-800">Book Title</th>
               <th className="py-2 px-4 border-b border-green-800">Borrower Name</th>
+              <th className="py-2 px-4 border-b border-green-800">Financial & Type</th>
               <th className="py-2 px-4 border-b border-green-800">Dates</th>
               <th className="py-2 px-4 border-b border-green-800 text-center">Actions</th>
             </tr>
@@ -233,10 +232,34 @@ const ActiveBorrowedBooks = () => {
                     <div className="font-bold text-gray-700 text-sm">{book.borrowerName}</div>
                   </td>
 
+                  <td className="py-0.5 px-4">
+                    <div className="flex flex-col gap-1">
+                      <div className="text-[10px] font-black">
+                        <span className="text-gray-500 uppercase">Paid: </span>
+                        {/* ✅ UPDATED: Points to borrowingCost instead of basePrice */}
+                        <span className={book.borrowingCost > 0 ? "text-green-700" : "text-blue-600"}>
+                          ${book.borrowingCost || 0}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase text-white ${book.bookType === 'Digital' ? 'bg-blue-500' : 'bg-gray-500'}`}>
+                          {book.bookType}
+                        </span>
+                        {book.bookType === 'Digital' && (
+                           <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200 uppercase">
+                            Via {book.deliveryMethod || 'Email'}
+                           </span>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+
                   <td className="py-0.5 px-4 text-[11px]">
                     <div className="flex flex-col leading-tight">
                       <span className="text-gray-600 font-bold">OUT: {new Date(book.borrowedDate).toLocaleDateString()}</span>
-                      <span className="text-red-600 font-black">DUE: {new Date(book.returnDate).toLocaleDateString()}</span>
+                      <span className={book.bookType === 'Digital' ? "text-blue-600 font-black italic" : "text-red-600 font-black"}>
+                        {book.bookType === 'Digital' ? "NO RETURN" : `DUE: ${new Date(book.returnDate).toLocaleDateString()}`}
+                      </span>
                     </div>
                   </td>
 
@@ -260,7 +283,7 @@ const ActiveBorrowedBooks = () => {
 
                 {deletingId === book._id && (
                   <tr className="bg-red-50/50">
-                    <td colSpan="5" className="p-2 border-l-4 border-red-600">
+                    <td colSpan="6" className="p-2 border-l-4 border-red-600">
                       <div className="flex flex-wrap items-center gap-2 justify-center">
                         <span className="text-[9px] font-black text-red-700 uppercase italic">Admin Required:</span>
                         <input type="email" placeholder="Email" className="border-2 p-1 text-[10px] rounded-md w-32 outline-none focus:border-red-600 font-bold" value={adminCreds.email} onChange={(e) => setAdminCreds({ ...adminCreds, email: e.target.value })} />

@@ -1,3 +1,4 @@
+// app/src/pages/Dashboard.jsx
 import React, { useEffect, useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
@@ -10,12 +11,14 @@ const Dashboard = () => {
   const [overdueCount, setOverdueCount] = useState(0);
 
   // Base menu items visible to all admins
+ // Base menu items visible to all admins
   const menuItems = [
     { name: "✅ Active Books", path: "/active-books" },
     { name: "📖 Borrow Book", path: "/add-book" },
     { name: "➕ Add Book Title", path: "/add-book-title" },
     { name: "👥 Students List", path: "/students" },
     { name: "👔 Staff List", path: "/staff" },
+    { name: "🌍 General Users", path: "/general-users" }, // ✅ Added this link
     { name: "🗂️ Archived Books", path: "/archived-books" },
     { name: "📊 Statistics", path: "/statistics" },
     { name: "⏰ Overdue Books", path: "/overdue", showBadge: true },

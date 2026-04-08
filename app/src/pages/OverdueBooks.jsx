@@ -34,7 +34,6 @@ const OverdueBooks = () => {
     window.open("http://localhost:5000/api/books/reports/overdue-books/pdf", "_blank");
   };
 
-  // ✅ UPDATED REMINDER: Handles both Email (Backend) and Phone (Device App)
   const handleSendReminder = async (book) => {
     const contact = book.contact?.trim();
 
@@ -44,18 +43,15 @@ const OverdueBooks = () => {
       return;
     }
 
-    // Check if contact is a Phone Number (contains digits, no @)
     const isPhone = /^\+?[0-9\s-]{7,15}$/.test(contact) && !contact.includes("@");
 
     if (isPhone) {
-      // Trigger external dialer app
       window.location.href = `tel:${contact}`;
       setStatus({ show: true, message: `Opening dialer for ${book.borrowerName}...`, type: "success" });
       setTimeout(() => setStatus({ show: false }), 4000);
       return;
     }
 
-    // Standard Email logic
     if (!contact.includes("@")) {
       setStatus({ show: true, message: "Invalid contact format.", type: "error" });
       setTimeout(() => setStatus({ show: false }), 4000);
@@ -65,7 +61,7 @@ const OverdueBooks = () => {
     setStatus({ show: true, message: `Sending email to ${book.borrowerName}...`, type: "success" });
 
     try {
-      const res = await axios.post(`http://localhost:5000/api/books/remind/${book._id}`, {}, axiosConfig);
+      await axios.post(`http://localhost:5000/api/books/remind/${book._id}`, {}, axiosConfig);
       setStatus({ show: true, message: "Reminder sent successfully!", type: "success" });
     } catch (err) {
       console.error("Reminder error:", err);
@@ -105,6 +101,9 @@ const OverdueBooks = () => {
     book.borrowerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (book.borrowerId && book.borrowerId.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  // Total value calculation
+  const totalOutstandingValue = filteredBooks.reduce((sum, b) => sum + (b.borrowingCost || 0), 0);
 
   return (
     <div className="p-8 bg-yellow-50 min-h-screen border-2 border-yellow-200 font-sans">
@@ -179,35 +178,34 @@ const OverdueBooks = () => {
           <thead>
             <tr className="bg-red-600 text-white uppercase text-[12px] tracking-widest">
               <th className="py-2 px-4 border-b border-red-700">Borrower ID</th>
-              <th className="py-2 px-4 border-b border-red-700">Book Information</th>
+              <th className="py-2 px-4 border-b border-red-700">Book Info</th>
               <th className="py-2 px-4 border-b border-red-700">Borrower Name</th>
               <th className="py-2 px-4 border-b border-red-700">Contact Action</th>
+              <th className="py-2 px-4 border-b border-red-700">Financials</th>
               <th className="py-2 px-4 border-b border-red-700">Due Status</th>
-              <th className="py-2 px-4 border-b border-red-700 text-right">Reference</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {filteredBooks.map((book) => (
               <tr key={book._id} className="hover:bg-red-50/50 transition-colors">
-                <td className="py-0.5 px-4">
+                <td className="py-1 px-4">
                   <span className="text-[10px] font-black text-red-700 bg-red-100 px-2 py-0.5 rounded-full uppercase">
                     {book.borrowerId || "NO-ID"}
                   </span>
                 </td>
-                <td className="py-0.5 px-4">
+                <td className="py-1 px-4">
                   <div className="font-black text-gray-800 leading-tight text-sm uppercase">{book.title}</div>
                   <div className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">
-                    {book.category} • {book.subCategory}
+                    {book.category} • {book.bookType || "Physical"}
                   </div>
                 </td>
-                <td className="py-0.5 px-4">
+                <td className="py-1 px-4">
                   <div className="font-bold text-gray-700 text-sm">{book.borrowerName}</div>
                 </td>
-                <td className="py-0.5 px-4">
+                <td className="py-1 px-4">
                   <button 
                     onClick={() => handleSendReminder(book)}
                     className="font-black text-blue-700 text-[10px] uppercase bg-blue-50 px-3 py-1 rounded-lg border border-blue-100 hover:bg-blue-600 hover:text-white transition-all active:scale-95 group"
-                    title={`Contact ${book.borrowerName}`}
                   >
                     <span className="group-hover:hidden">
                        {book.contact?.includes("@") ? "📩" : "📞"} {book.contact || "Missing"}
@@ -218,25 +216,31 @@ const OverdueBooks = () => {
                   </button>
                 </td>
                 <td className="py-1 px-4">
+                   <div className="flex flex-col">
+                      <span className="text-[9px] text-gray-400 font-bold uppercase">Fees:</span>
+                      <span className="text-green-700 font-black text-sm">${book.borrowingCost || 0}</span>
+                   </div>
+                </td>
+                <td className="py-1 px-4">
                   <div className="flex flex-col leading-tight">
                     <span className="text-[9px] text-gray-400 font-bold uppercase">Due Since:</span>
                     <span className="text-red-600 font-black text-sm">{new Date(book.returnDate).toLocaleDateString()}</span>
                   </div>
                 </td>
-                <td className="py-0.5 px-4 text-right">
-                  <span className="text-[9px] text-gray-400 font-black italic uppercase">
-                    #{book._id.slice(-6)}
-                  </span>
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <div className="p-3 bg-red-50 rounded-b-xl flex justify-center">
+        
+        <div className="p-4 bg-red-50 rounded-b-xl flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-red-600 font-black text-[11px] uppercase flex items-center gap-2">
               <span className="animate-pulse text-lg">●</span> 
-              {filteredBooks.length} Overdue Records ● Follow up via Email or Phone
+              {filteredBooks.length} Overdue Records 
             </p>
+            <div className="bg-white px-4 py-2 rounded-xl border-2 border-red-100 shadow-sm">
+                <span className="text-[10px] font-black text-gray-500 uppercase mr-2">Total At Risk Value:</span>
+                <span className="text-red-600 font-black text-lg">${totalOutstandingValue}</span>
+            </div>
         </div>
       </div>
     </div>

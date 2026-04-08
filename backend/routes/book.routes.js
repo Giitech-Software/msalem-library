@@ -7,7 +7,8 @@ const Log = require("../models/Log");
 const PDFDocument = require("pdfkit");
 const nodemailer = require("nodemailer");
 const auth = require("../middleware/auth"); 
-const path = require("path"); // <-- Added to handle file paths correctly
+const path = require("path"); 
+const fs = require("fs"); // Moved up for consistency
 
 // --- EMAIL CONFIGURATION ---
 const transporter = nodemailer.createTransport({
@@ -123,18 +124,16 @@ router.post("/borrow", auth, async (req, res) => {
     
     const isDigital = bookType === "Digital";
 
-    // --- NEW: VERIFY FILE EXISTS BEFORE SAVING TO DB ---
+    // --- VERIFY FILE EXISTS BEFORE SAVING TO DB ---
     let filePath = "";
-    if (isDigital && deliveryMethod === "Email") {
+    if (isDigital) {
       if (!pdfUrl) {
         return res.status(400).json({ message: "Digital book has no file attached in catalog." });
       }
 
-      // Pointing to the CORRECT sub-folder: uploads/pdfs
       const fileName = path.basename(pdfUrl);
       filePath = path.resolve(__dirname, "..", "uploads", "pdfs", fileName);
 
-      const fs = require("fs");
       if (!fs.existsSync(filePath) || fs.lstatSync(filePath).isDirectory()) {
         console.error(`❌ FILE MISSING OR IS A DIRECTORY: ${filePath}`);
         return res.status(404).json({ message: "PDF file not found on server. Please re-upload the book." });
@@ -153,15 +152,11 @@ router.post("/borrow", auth, async (req, res) => {
     const book = new Book(bookData);
     await book.save();
 
-    // --- 🟢 NEW: WHATSAPP DISPATCH LOGIC ---
-
-
-if (isDigital && deliveryMethod && deliveryMethod.toUpperCase() === "WHATSAPP") {
-    console.log("🎯 WhatsApp Logic Triggered for:", contact);
-    // ... rest of your WA code
-}
+    // --- 🟢 WHATSAPP DISPATCH LOGIC (COMMENTED OUT FOR ELECTRON) ---
+    /*
+    if (isDigital && deliveryMethod && deliveryMethod.toUpperCase() === "WHATSAPP") {
+      console.log("🎯 WhatsApp Logic Triggered for:", contact);
       
-      {
       // 1. Format the number for Ghana (+233)
       let cleanNumber = contact.replace(/\D/g, ''); 
       if (cleanNumber.startsWith('0')) {
@@ -187,9 +182,9 @@ if (isDigital && deliveryMethod && deliveryMethod.toUpperCase() === "WHATSAPP") 
         waLink: waLink 
       });
     }
+    */
 
-    
-    // 3. --- DIGITAL DISPATCH ---
+    // 3. --- DIGITAL DISPATCH: EMAIL ---
     if (isDigital && deliveryMethod === "Email" && contact && contact.includes("@")) {
       const mailOptions = {
         from: `"M'Salem School Library" <${process.env.EMAIL_USER}>`,
@@ -218,7 +213,6 @@ if (isDigital && deliveryMethod && deliveryMethod.toUpperCase() === "WHATSAPP") 
       } catch (mailError) {
         console.error("❌ NODEMAILER FAIL:", mailError.message);
         await Book.findByIdAndUpdate(book._id, { dispatchStatus: "Failed" });
-        // We don't return 500 here because the book IS already saved in DB
       }
     }
 
