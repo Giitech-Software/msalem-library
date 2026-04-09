@@ -1,3 +1,4 @@
+//backend/routes/auth.routes.js
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
@@ -5,7 +6,7 @@ const Log = require('../models/Log'); // ✅ NEW IMPORT
 
 const auth = require("../middleware/auth");
 const superAdmin = require("../middleware/superAdmin");
-
+const FinancialRecord = require("../models/FinancialRecord"); // ✅ ADD THIS
 const router = express.Router();
 
 // ================= REGISTER =================
@@ -141,6 +142,21 @@ router.get("/logs", auth, superAdmin, async (req, res) => {
     res.json(logs);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch security logs" });
+  }
+});
+
+
+
+// ================= FINANCIAL VAULT =================
+// ✅ NEW: GET FINANCIAL RECORDS (Superadmin only)
+router.get("/financials", auth, superAdmin, async (req, res) => {
+  try {
+    // Only a superadmin can reach this point because of the 'superAdmin' middleware
+    const records = await FinancialRecord.find().sort({ date: -1 });
+    res.json(records);
+  } catch (err) {
+    console.error("Financial Fetch Error:", err);
+    res.status(500).json({ message: "Failed to fetch financial records" });
   }
 });
 

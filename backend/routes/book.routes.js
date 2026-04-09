@@ -4,11 +4,16 @@ const router = express.Router();
 const Book = require("../models/Book");
 const Admin = require("../models/Admin");
 const Log = require("../models/Log"); 
+const FinancialRecord = require("../models/FinancialRecord"); // ✅ NEW: Import the Vault
 const PDFDocument = require("pdfkit");
 const nodemailer = require("nodemailer");
 const auth = require("../middleware/auth"); 
 const path = require("path"); 
-const fs = require("fs"); // Moved up for consistency
+const fs = require("fs"); 
+
+const Student = require("../models/Student"); 
+const Staff = require("../models/Staff");     
+const GeneralUser = require("../models/GeneralUser");
 
 // --- EMAIL CONFIGURATION ---
 const transporter = nodemailer.createTransport({
@@ -103,55 +108,75 @@ const generateLibraryPDF = async (res, books, config, recipientEmail = null) => 
 
 // --- CORE ROUTES ---
 
-router.get("/borrowed", auth, async (req, res) => {
-  try {
-    const activeBooks = await Book.find({ returned: false });
-    res.status(200).json(activeBooks);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch borrowed records" });
-  }
-});
-
 router.post("/borrow", auth, async (req, res) => { 
-  try {
-    const { bookType, borrowerName, title, deliveryMethod, contact, pdfUrl } = req.body;
+  try {
+    const { 
+      bookType, borrowerName, title, deliveryMethod, contact, 
+      pdfUrl, borrowerId, category, subCategory, borrowingCost // ✅ Extract borrowingCost
+    } = req.body;
 
-    // 1. Validation for Physical Books
-    if (bookType === "Physical") {
-      const existing = await Book.findOne({ borrowerName, returned: false, bookType: "Physical" });
-      if (existing) return res.status(400).json({ message: "Borrower must return previous physical book first." });
+    // 1. Validation for Physical Books
+    if (bookType === "Physical") {
+      const existing = await Book.findOne({ borrowerName, returned: false, bookType: "Physical" });
+      if (existing) return res.status(400).json({ message: "Borrower must return previous physical book first." });
+    }
+    
+    const isDigital = bookType === "Digital";
+
+    // --- VERIFY FILE EXISTS FOR DIGITAL ---
+    let filePath = "";
+    if (isDigital) {
+      if (!pdfUrl) return res.status(400).json({ message: "Digital book has no file attached." });
+      const fileName = path.basename(pdfUrl);
+      filePath = path.resolve(__dirname, "..", "uploads", "pdfs", fileName);
+      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "PDF file not found on server." });
+    }
+
+    // ============================================================
+    // 🟢 SMART FEEDER: SYNC USER DATA (Kept Intact)
+    // ============================================================
+    const userData = {
+      name: borrowerName,
+      category: category,
+      subCategory: subCategory,
+      contact: contact,
+    };
+
+    if (category === "Staff") {
+      await Staff.findOneAndUpdate({ name: borrowerName }, { ...userData, staffId: borrowerId }, { upsert: true, new: true });
+    } else if (category === "General User") {
+      await GeneralUser.findOneAndUpdate({ name: borrowerName }, { ...userData, borrowerId: borrowerId }, { upsert: true, new: true });
+    } else if (category) {
+      await Student.findOneAndUpdate({ name: borrowerName }, { ...userData, studentId: borrowerId }, { upsert: true, new: true });
+    }
+
+    // 2. Save Borrowing Record to Database
+    const bookData = { 
+      ...req.body, 
+      returned: isDigital, 
+      status: isDigital ? "Dispatched" : "Borrowed",
+      returnDate: isDigital ? undefined : req.body.returnDate,
+      dispatchStatus: isDigital ? "Pending" : "N/A"
+    };
+
+    const book = new Book(bookData);
+    await book.save();
+
+    // ============================================================
+    // 💰 HIGH SECURITY FINANCIAL VAULT (NEW)
+    // Even if 'book' is deleted, this record stays.
+    // ============================================================
+    if (borrowingCost && borrowingCost > 0) {
+      await FinancialRecord.create({
+        title: title,
+        borrowerName: borrowerName,
+        borrowerId: borrowerId,
+        bookType: bookType,
+        amount: borrowingCost,
+        issuedBy: req.admin.email, // Log which admin handled the cash
+        date: new Date()
+      });
     }
-    
-    const isDigital = bookType === "Digital";
-
-    // --- VERIFY FILE EXISTS BEFORE SAVING TO DB ---
-    let filePath = "";
-    if (isDigital) {
-      if (!pdfUrl) {
-        return res.status(400).json({ message: "Digital book has no file attached in catalog." });
-      }
-
-      const fileName = path.basename(pdfUrl);
-      filePath = path.resolve(__dirname, "..", "uploads", "pdfs", fileName);
-
-      if (!fs.existsSync(filePath) || fs.lstatSync(filePath).isDirectory()) {
-        console.error(`❌ FILE MISSING OR IS A DIRECTORY: ${filePath}`);
-        return res.status(404).json({ message: "PDF file not found on server. Please re-upload the book." });
-      }
-    }
-
-    // 2. Save to Database
-    const bookData = { 
-      ...req.body, 
-      returned: isDigital, 
-      status: isDigital ? "Dispatched" : "Borrowed",
-      returnDate: isDigital ? undefined : req.body.returnDate,
-      dispatchStatus: isDigital ? "Pending" : "N/A"
-    };
-
-    const book = new Book(bookData);
-    await book.save();
-
     // --- 🟢 WHATSAPP DISPATCH LOGIC (COMMENTED OUT FOR ELECTRON) ---
     /*
     if (isDigital && deliveryMethod && deliveryMethod.toUpperCase() === "WHATSAPP") {
@@ -185,7 +210,8 @@ router.post("/borrow", auth, async (req, res) => {
     */
 
     // 3. --- DIGITAL DISPATCH: EMAIL ---
-    if (isDigital && deliveryMethod === "Email" && contact && contact.includes("@")) {
+    // 3. --- DIGITAL DISPATCH: EMAIL ---
+    if (isDigital && deliveryMethod === "Email" && contact?.includes("@")) {
       const mailOptions = {
         from: `"M'Salem School Library" <${process.env.EMAIL_USER}>`,
         to: contact,
@@ -209,7 +235,6 @@ router.post("/borrow", auth, async (req, res) => {
       try {
         await transporter.sendMail(mailOptions);
         await Book.findByIdAndUpdate(book._id, { dispatchStatus: "Sent" });
-        console.log(`✅ Email sent successfully to ${contact}`);
       } catch (mailError) {
         console.error("❌ NODEMAILER FAIL:", mailError.message);
         await Book.findByIdAndUpdate(book._id, { dispatchStatus: "Failed" });
@@ -217,21 +242,49 @@ router.post("/borrow", auth, async (req, res) => {
     }
 
     // 4. Log Action
-    await Log.create({
-      adminEmail: req.admin.email,
-      action: isDigital ? "Digital Dispatch" : "Book Borrowed",
-      details: `Sent "${book.title}" to ${book.borrowerName}`
-    });
+   await Log.create({
+      adminEmail: req.admin.email,
+      action: isDigital ? "Digital Dispatch" : "Book Borrowed",
+      details: `Issued "${book.title}" to ${book.borrowerName} for GHS ${borrowingCost || 0}`
+    });
 
-    res.status(201).json({ 
-      message: isDigital ? "Digital dispatch successful!" : "Book issued successfully", 
-      book 
-    });
+    res.status(201).json({ 
+      message: isDigital ? "Digital dispatch successful!" : "Book issued successfully", 
+      book 
+    });
 
-  } catch (error) { 
-    console.error("Issuance Error:", error);
-    res.status(500).json({ message: error.message || "Failed to process issuance" }); 
-  }
+  } catch (error) { 
+    console.error("Issuance Error:", error);
+    res.status(500).json({ message: error.message || "Failed to process issuance" }); 
+  }
+});
+
+// ✅ ADDED: Mark financial records as "Orphaned" if a book is deleted
+router.post("/delete/:id", auth, async (req, res) => { 
+  const { email, password } = req.body;
+  try {
+    const admin = await Admin.findOne({ email });
+    if (!admin || !(await admin.comparePassword(password))) {
+      return res.status(401).json({ message: "Invalid admin credentials" });
+    }
+    const book = await Book.findById(req.params.id);
+    if (!book) return res.status(404).json({ message: "Book not found" });
+
+    // Before deleting, update financial vault to show this record is now orphaned
+    await FinancialRecord.updateMany(
+      { borrowerId: book.borrowerId, title: book.title },
+      { isOrphaned: true }
+    );
+
+    await Book.findByIdAndDelete(req.params.id);
+
+    await Log.create({
+      adminEmail: email,
+      action: "Book Deletion",
+      details: `CRITICAL: Deleted record for "${book.title}" held by ${book.borrowerName}. Financial record preserved.`
+    });
+    res.status(200).json({ message: "Book deleted successfully" });
+  } catch (error) { res.status(500).json({ message: "Delete failed" }); }
 });
 
 router.get("/active", async (req, res) => {

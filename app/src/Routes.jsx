@@ -17,9 +17,10 @@ import StudentList from "./pages/StudentList";
 import StaffList from "./pages/StaffList";
 import AdminManagement from "./pages/AdminManagement"; 
 import SecurityLogs from "./pages/SecurityLogs"; 
-
-// ✅ New Page Import
 import GeneralUserList from "./pages/GeneralUserList"; 
+
+// ✅ NEW: Import the Financial Vault Page
+import SuperAdminFinance from "./pages/SuperAdminFinance"; 
 
 const AppRoutes = () => {
   return (
@@ -41,11 +42,9 @@ const AppRoutes = () => {
       {/* People Management */}
       <Route path="/students" element={<ProtectedRoute><StudentList /></ProtectedRoute>} />
       <Route path="/staff" element={<ProtectedRoute><StaffList /></ProtectedRoute>} />
-      
-      {/* ✅ New Route for Community/General Users */}
       <Route path="/general-users" element={<ProtectedRoute><GeneralUserList /></ProtectedRoute>} />
 
-      {/* Superadmin ONLY Pages */}
+      {/* 🛡️ Superadmin ONLY Pages */}
       <Route 
         path="/admin-management" 
         element={
@@ -60,6 +59,16 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute requiredRole="superadmin">
             <SecurityLogs />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* ✅ NEW: Superadmin Financial Vault Route */}
+      <Route 
+        path="/financial-vault" 
+        element={
+          <ProtectedRoute requiredRole="superadmin">
+            <SuperAdminFinance />
           </ProtectedRoute>
         } 
       />

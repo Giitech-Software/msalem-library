@@ -1,3 +1,4 @@
+// app/src/pages/StudentList.jsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import BackButton from "../components/BackButton";
@@ -28,7 +29,6 @@ const StudentList = () => {
 
   const allSubCategories = Object.values(categories).flat();
 
-  // Helper to get auth headers
   const getAuthHeaders = () => {
     const token = localStorage.getItem("token");
     return { headers: { Authorization: `Bearer ${token}` } };
@@ -43,9 +43,11 @@ const StudentList = () => {
     } catch (err) { console.error(err); }
   };
 
+  // ✅ UPDATED: Search now includes studentId
   const filteredStudents = students.filter(std => 
     std.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    std.subCategory.toLowerCase().includes(searchTerm.toLowerCase())
+    std.subCategory.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (std.studentId && std.studentId.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleBulkImport = async (e) => {
@@ -56,7 +58,7 @@ const StudentList = () => {
         names: nameArray,
         category: form.category,
         subCategory: form.subCategory
-      }, getAuthHeaders()); // ✅ Added Headers
+      }, getAuthHeaders());
       
       showStatus(`Successfully imported ${nameArray.length} students!`, "success");
       setBulkData("");
@@ -106,15 +108,15 @@ const StudentList = () => {
         const res = await axios.post("http://localhost:5000/api/students/promote", {
           fromSubCategory: promo.from,
           toSubCategory: promo.to
-        }, getAuthHeaders()); // ✅ Added Headers
+        }, getAuthHeaders());
         showStatus(res.data.message, "success");
       } else if (modal.type === 'graduate') {
         const res = await axios.post("http://localhost:5000/api/students/graduate", {
           subCategory: gradClass
-        }, getAuthHeaders()); // ✅ Added Headers
+        }, getAuthHeaders());
         showStatus(res.data.message, "success");
       } else if (modal.type === 'delete') {
-        await axios.delete(`http://localhost:5000/api/students/${modal.id}`, getAuthHeaders()); // ✅ Added Headers
+        await axios.delete(`http://localhost:5000/api/students/${modal.id}`, getAuthHeaders());
         showStatus("Student removed", "success");
       }
       fetchStudents();
@@ -132,7 +134,7 @@ const StudentList = () => {
 
   const handleUpdateStudent = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/students/${id}`, { name: editName }, getAuthHeaders()); // ✅ Added Headers
+      await axios.put(`http://localhost:5000/api/students/${id}`, { name: editName }, getAuthHeaders());
       showStatus("Student updated", "success");
       setEditingId(null);
       fetchStudents();
@@ -144,7 +146,6 @@ const StudentList = () => {
     setTimeout(() => setStatus({ show: false }), 4000);
   };
 
-  // ... (Rest of the JSX remains the same as your previous version)
   return (
     <div className="p-8 bg-yellow-50 min-h-screen border-2 border-yellow-200 relative">
       <BackButton label="⬅ Return to Dashboard" />
@@ -170,7 +171,7 @@ const StudentList = () => {
           <div className="mb-6">
             <input 
               type="text"
-              placeholder="🔍 Search by name or class (e.g. B1, Nursery)..."
+              placeholder="🔍 Search by name, ID, or class..."
               className="w-full p-2 rounded-2xl border-2 border-yellow-200 shadow-sm outline-none focus:border-green-600 transition"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -178,6 +179,7 @@ const StudentList = () => {
           </div>
         )}
 
+        {/* ... (Bulk, Promote, Graduate views remain exactly the same) ... */}
         {view === "bulk" && (
           <div className="bg-white p-8 rounded-3xl shadow-xl border-t-8 border-yellow-500">
             <h2 className="text-xl font-bold mb-4">Paste Student Names</h2>
@@ -241,7 +243,7 @@ const StudentList = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredStudents.map(std => (
               <div key={std._id} className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-green-600 flex flex-col hover:shadow-md transition">
-                <div className="flex justify-between items-center mb-3">
+                <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
                     {editingId === std._id ? (
                       <input 
@@ -252,15 +254,28 @@ const StudentList = () => {
                       />
                     ) : (
                       <>
-                        <p className="font-bold text-gray-800">{std.name}</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-bold text-gray-800">{std.name}</p>
+                          {/* ✅ NEW: Student ID Badge */}
+                          {std.studentId && (
+                            <span className="bg-green-100 text-green-700 text-[9px] font-black px-1.5 py-0.5 rounded border border-green-200 uppercase">
+                              {std.studentId}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{std.category} • {std.subCategory}</p>
+                        
+                        {/* ✅ NEW: Contact Display */}
+                        {std.contact && (
+                          <p className="text-[10px] text-gray-500 italic mt-1 truncate">📞 {std.contact}</p>
+                        )}
                       </>
                     )}
                   </div>
-                  <span className="text-2xl bg-green-50 p-2 rounded-full ml-2">🎓</span>
+                  <span className="text-xl bg-green-50 p-1.5 rounded-full ml-2">🎓</span>
                 </div>
 
-                <div className="flex gap-2 pt-2 border-t border-gray-50">
+                <div className="flex gap-2 pt-2 border-t border-gray-50 mt-auto">
                   {editingId === std._id ? (
                     <>
                       <button onClick={() => handleUpdateStudent(std._id)} className="flex-1 text-[10px] font-bold uppercase bg-green-700 text-white py-1.5 rounded-lg">Save</button>
@@ -282,6 +297,7 @@ const StudentList = () => {
         )}
       </div>
 
+      {/* Modal remains same */}
       {modal.open && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-100 p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">

@@ -1,4 +1,4 @@
-//app/src/pages/StaffList.jsx
+// app/src/pages/StaffList.jsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import BackButton from "../components/BackButton";
@@ -10,15 +10,12 @@ const StaffList = () => {
   const [status, setStatus] = useState({ show: false, message: "", type: "" });
   const [searchTerm, setSearchTerm] = useState(""); 
 
-  // States for Editing
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
 
-  // States for Custom Delete Confirmation
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedStaffId, setSelectedStaffId] = useState(null);
 
-  // ✅ Helper to get the token for protected routes
   const getAuthHeaders = () => {
     const token = localStorage.getItem("token");
     return { headers: { Authorization: `Bearer ${token}` } };
@@ -28,7 +25,6 @@ const StaffList = () => {
 
   const fetchStaff = async () => {
     try {
-      // ✅ Added headers to the GET request
       const res = await axios.get("http://localhost:5000/api/staff", getAuthHeaders());
       setStaff(res.data);
     } catch (err) { 
@@ -37,16 +33,16 @@ const StaffList = () => {
     }
   };
 
-  // --- Search Logic ---
+  // ✅ UPDATED: Search now includes staffId
   const filteredStaff = staff.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase())
+    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s.staffId && s.staffId.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleBulkAdd = async (e) => {
     e.preventDefault();
     const names = bulkNames.split(/[\n,]+/).map(n => n.trim()).filter(n => n);
     try {
-      // ✅ Added headers to the POST request
       await axios.post("http://localhost:5000/api/staff/bulk", { names }, getAuthHeaders());
       showStatus(`Successfully added ${names.length} staff members!`, "success");
       setBulkNames("");
@@ -69,7 +65,6 @@ const StaffList = () => {
 
   const confirmDelete = async () => {
     try {
-      // ✅ Added headers to the DELETE request
       await axios.delete(`http://localhost:5000/api/staff/${selectedStaffId}`, getAuthHeaders());
       showStatus("Staff member removed.", "success");
       fetchStaff();
@@ -87,7 +82,6 @@ const StaffList = () => {
 
   const handleUpdate = async (id) => {
     try {
-      // ✅ Added headers to the PUT request
       await axios.put(`http://localhost:5000/api/staff/${id}`, { name: editName }, getAuthHeaders());
       showStatus("Staff member updated!", "success");
       setEditingId(null);
@@ -124,11 +118,12 @@ const StaffList = () => {
             {view === 'list' ? "+ Bulk Add Staff" : "View Directory"}
           </button>
         </div>
+
         {view === 'list' && (
           <div className="mb-6">
             <input 
               type="text"
-              placeholder="🔍 Search staff members by name..."
+              placeholder="🔍 Search staff by name or Staff ID..."
               className="w-full p-2 rounded-2xl border-2 border-yellow-200 shadow-sm outline-none focus:border-green-600 transition"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -143,7 +138,7 @@ const StaffList = () => {
             <form onSubmit={handleBulkAdd}>
               <textarea 
                 className="w-full h-64 border-2 p-4 rounded-2xl focus:border-green-600 outline-none mb-4 bg-gray-50 font-mono text-sm"
-                placeholder="Mr. Thompson&#10;Madam Elizabeth&#10;Coach Adams..."
+                placeholder="Mr. Thompson&#10;Madam Elizabeth..."
                 value={bulkNames}
                 onChange={(e) => setBulkNames(e.target.value)}
                 required
@@ -168,8 +163,21 @@ const StaffList = () => {
                       />
                     ) : (
                       <>
-                        <p className="font-bold text-gray-800 group-hover:text-green-700 transition">{s.name}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-gray-800 group-hover:text-green-700 transition">{s.name}</p>
+                          {/* ✅ NEW: Staff ID Badge */}
+                          {s.staffId && (
+                            <span className="bg-blue-100 text-blue-700 text-[9px] font-black px-1.5 py-0.5 rounded border border-blue-200 uppercase">
+                              {s.staffId}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Official Staff</p>
+                        
+                        {/* ✅ NEW: Contact Display */}
+                        {s.contact && (
+                          <p className="text-[10px] text-gray-500 italic mt-1 truncate">📞 {s.contact}</p>
+                        )}
                       </>
                     )}
                   </div>
@@ -205,6 +213,7 @@ const StaffList = () => {
         )}
       </div>
 
+      {/* Delete Modal remains the same */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">

@@ -13,6 +13,8 @@ const auth = require("../middleware/auth");
 // GET all students (Ordered Alphabetically)
 router.get("/students", async (req, res) => {
   try {
+    // We explicitly sort by name, and Mongo will include studentId automatically 
+    // unless we tell it not to.
     const students = await Student.find().sort({ name: 1 });
     res.json(students);
   } catch (err) {
