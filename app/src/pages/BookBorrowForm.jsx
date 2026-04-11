@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+// ✅ CHANGED: Using centralized API instance instead of raw axios
+import API from "../api/axiosInstance"; 
 import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton"; 
 
@@ -46,21 +47,19 @@ const BorrowBook = () => {
     "General User": ["Community Member", "Parent", "Visitor", "Alumni"], 
   };
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token");
-    return { headers: { Authorization: `Bearer ${token}` } };
-  };
+  // ✅ REMOVED: getAuthHeaders is no longer needed 
+  // The API instance automatically attaches the token from localStorage.
 
   useEffect(() => {
     const loadAllData = async () => {
      try {
-        const config = getAuthHeaders();
+        // ✅ CHANGED: Using API instance. No need to pass headers manually.
         const [catRes, stdRes, stfRes, borrowRes, gnrRes] = await Promise.allSettled([
-          axios.get("http://localhost:5000/api/bookCatalog", config),
-          axios.get("http://localhost:5000/api/students", config),
-          axios.get("http://localhost:5000/api/staff", config),
-          axios.get("http://localhost:5000/api/books/borrowed", config),
-          axios.get("http://localhost:5000/api/general", config) 
+          API.get("/bookCatalog"),
+          API.get("/students"),
+          API.get("/staff"),
+          API.get("/books/borrowed"),
+          API.get("/general") 
         ]);
 
         if (catRes.status === 'fulfilled') setCatalog(catRes.value.data || []);
@@ -93,13 +92,7 @@ const BorrowBook = () => {
     }
 
     if (name === "title") {
-      setForm(prev => ({ 
-        ...prev, 
-        title: value, 
-        bookType: "Physical", 
-        basePrice: 0 
-      }));
-
+      setForm(prev => ({ ...prev, title: value, bookType: "Physical", basePrice: 0 }));
       const search = value.toLowerCase();
       const matches = catalog
         .filter((book) => book.title && book.title.toLowerCase().includes(search))
@@ -174,11 +167,7 @@ const BorrowBook = () => {
     if (form.bookType === "Digital") {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!form.contact || !emailRegex.test(form.contact)) {
-        setStatus({ 
-          show: true, 
-          message: "A valid Email is required for Digital dispatch!", 
-          type: "error" 
-        });
+        setStatus({ show: true, message: "Valid Email is required for Digital dispatch!", type: "error" });
         return;
       }
     }
@@ -191,7 +180,8 @@ const BorrowBook = () => {
     };
 
     try {
-      const res = await axios.post("http://localhost:5000/api/books/borrow", payload, getAuthHeaders());
+      // ✅ CHANGED: Using API instance for submission
+      const res = await API.post("/books/borrow", payload);
       
       setForm(initialFormState);
       setFilteredTitles([]);
@@ -206,6 +196,8 @@ const BorrowBook = () => {
       setSubmitCount(prev => prev + 1);
       setTimeout(() => setStatus({ show: false }), 4000);
     } catch (error) {
+      // 401 errors are handled by the interceptor. 
+      // This catch handles 400s (validation) or 500s.
       const msg = error.response?.data?.message || "Error processing request.";
       setStatus({ show: true, message: msg, type: "error" });
     }
@@ -220,7 +212,7 @@ const BorrowBook = () => {
           status.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
         }`}>
           <div className="flex items-center gap-3">
-            <span className="font-bold">{status.message}</span>
+            <span className="font-bold text-sm uppercase">{status.message}</span>
             <button onClick={() => setStatus({show: false})} className="ml-2 hover:opacity-70">✕</button>
           </div>
         </div>
@@ -233,7 +225,7 @@ const BorrowBook = () => {
           
           <div className="relative">
             <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Live Book Inventory</label>
-            <input name="title" value={form.title} onChange={handleChange} required autoComplete="off" placeholder="Search by title..." className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none font-bold" />
+            <input name="title" value={form.title} onChange={handleChange} required autoComplete="off" placeholder="Search by title..." className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none font-bold bg-gray-50/50" />
             
             {form.title && (
               <div className="mt-1 flex gap-2">
@@ -274,7 +266,7 @@ const BorrowBook = () => {
 
           <hr className="border-dashed border-gray-100" />
 
-          <div className="bg-yellow-50 p-2 rounded-2xl border-2 border-yellow-100 flex items-center justify-between">
+          <div className="bg-yellow-50 p-3 rounded-2xl border-2 border-yellow-100 flex items-center justify-between">
             <div className="flex-1">
               <label className="text-[10px] font-black text-yellow-700 uppercase tracking-widest ml-1 block mb-1">Adjust Issuance Price</label>
               <div className="relative max-w-37.5">
@@ -292,46 +284,28 @@ const BorrowBook = () => {
                 <button type="button" onClick={resetToOriginalPrice} className="text-[9px] font-black bg-white border border-yellow-300 text-yellow-700 px-2 py-1 rounded-lg hover:bg-yellow-100 transition uppercase">
                     ↺ Reset Price
                 </button>
-                <p className="text-[8px] text-yellow-600 font-bold mt-1 uppercase italic">* Set to 0 for free school issuance</p>
             </div>
           </div>
 
           <div className="relative">
             <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Borrower Name</label>
-            <input name="borrowerName" value={form.borrowerName} onChange={handleChange} required autoComplete="off" placeholder="Search name..." className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none font-bold" />
+            <input name="borrowerName" value={form.borrowerName} onChange={handleChange} required autoComplete="off" placeholder="Search name..." className="w-full border-2 p-2 rounded-xl focus:border-green-600 outline-none font-bold bg-gray-50/50" />
             {filteredNames.length > 0 && (
               <div className="absolute z-30 bg-white border-2 border-green-100 w-full rounded-2xl shadow-2xl mt-1">
               {filteredNames.map(p => (
-                <div 
-                  key={p._id} 
-                  className="p-3 hover:bg-green-50 cursor-pointer border-b last:border-0 flex justify-between items-center transition-colors" 
-                  onClick={() => handleSelectPerson(p)}
-                >
+                <div key={p._id} className="p-3 hover:bg-green-50 cursor-pointer border-b last:border-0 flex justify-between items-center transition-colors" onClick={() => handleSelectPerson(p)}>
                   <div className="flex items-center gap-3">
-                    <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm ${
-                      p.type === 'Student' ? 'bg-yellow-100' : 
-                      p.type === 'Staff' ? 'bg-green-100' : 'bg-blue-100'
-                    }`}>
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm ${p.type === 'Student' ? 'bg-yellow-100' : p.type === 'Staff' ? 'bg-green-100' : 'bg-blue-100'}`}>
                       {p.type === 'Student' ? '🎓' : p.type === 'Staff' ? '👔' : '🌍'}
                     </div>
-                    
                     <div className="flex flex-col">
                       <span className="font-bold text-gray-800 leading-none">{p.name}</span>
-                      <span className="text-[9px] text-gray-500 font-medium mt-1 uppercase">
-                        {p.subCategory || p.type}
-                      </span>
+                      <span className="text-[9px] text-gray-500 font-medium mt-1 uppercase">{p.subCategory || p.type}</span>
                     </div>
                   </div>
-
                   <div className="flex flex-col items-end gap-1">
-                    <span className={`text-[8px] px-2 py-0.5 rounded-md font-black uppercase tracking-widest ${
-                      p.type === 'Student' ? 'bg-yellow-400 text-green-900' : 
-                      p.type === 'Staff' ? 'bg-green-700 text-white' : 'bg-blue-600 text-white'
-                    }`}>
+                    <span className={`text-[8px] px-2 py-0.5 rounded-md font-black uppercase tracking-widest ${p.type === 'Student' ? 'bg-yellow-400 text-green-900' : p.type === 'Staff' ? 'bg-green-700 text-white' : 'bg-blue-600 text-white'}`}>
                       {p.type}
-                    </span>
-                    <span className="text-[9px] text-gray-400 font-mono italic">
-                      {p.studentId || p.staffId || p.borrowerId || "NO ID"}
                     </span>
                   </div>
                 </div>
@@ -350,17 +324,8 @@ const BorrowBook = () => {
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">
-                  Contact Info {form.bookType === 'Digital' && <span className="text-red-500">*</span>}
-                </label>
-                <input 
-                  name="contact" 
-                  value={form.contact} 
-                  onChange={handleChange} 
-                  required={form.bookType === 'Digital'}
-                  placeholder={form.bookType === 'Digital' ? "Enter Email Address" : "Phone/Email"} 
-                  className={`w-full border-2 p-2 rounded-xl outline-none font-bold ${form.bookType === 'Digital' && !form.contact ? 'border-red-300 bg-red-50' : 'focus:border-green-600'}`} 
-                />
+                <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Contact Info</label>
+                <input name="contact" value={form.contact} onChange={handleChange} required={form.bookType === 'Digital'} placeholder={form.bookType === 'Digital' ? "Email for PDF" : "Phone/Email"} className={`w-full border-2 p-2 rounded-xl outline-none font-bold ${form.bookType === 'Digital' && !form.contact ? 'border-red-300 bg-red-50' : 'focus:border-green-600'}`} />
               </div>
           </div>
 
@@ -383,20 +348,18 @@ const BorrowBook = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Date Borrowed</label>
-              <input type="date" name="borrowedDate" value={form.borrowedDate} max={today} onChange={handleChange} required className="w-full border-2 p-2 rounded-xl font-bold text-gray-700" />
+              <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Date Issued</label>
+              <input type="date" name="borrowedDate" value={form.borrowedDate} max={today} onChange={handleChange} required className="w-full border-2 p-2 rounded-xl font-bold text-gray-700 bg-gray-50" />
             </div>
             
             <div className={form.bookType === 'Digital' ? 'opacity-30 pointer-events-none' : ''}>
-              <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">
-                {form.bookType === 'Digital' ? "No Return Needed" : "Expected Return"}
-              </label>
-              <input type="date" name="returnDate" value={form.returnDate} min={form.borrowedDate} onChange={handleChange} required={form.bookType !== 'Digital'} className="w-full border-2 p-2 rounded-xl font-bold text-gray-700" />
+              <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Expected Return</label>
+              <input type="date" name="returnDate" value={form.returnDate} min={form.borrowedDate} onChange={handleChange} required={form.bookType !== 'Digital'} className="w-full border-2 p-2 rounded-xl font-bold text-gray-700 bg-gray-50" />
             </div>
           </div>
 
-          <button type="submit" className={`py-3 rounded-xl font-black text-lg transition shadow-lg mt-2 uppercase tracking-tighter ${form.bookType === 'Digital' ? 'bg-blue-700 text-white hover:bg-blue-800' : 'bg-green-700 text-yellow-300 hover:bg-green-800'}`}>
-            {form.bookType === 'Digital' ? "🚀 Dispatch via Email" : "Confirm Physical Issuance"}
+          <button type="submit" className={`py-4 rounded-2xl font-black text-lg transition shadow-lg mt-2 uppercase tracking-tight ${form.bookType === 'Digital' ? 'bg-blue-700 text-white hover:bg-blue-800' : 'bg-green-700 text-yellow-300 hover:bg-green-800'}`}>
+            {form.bookType === 'Digital' ? "🚀 Dispatch PDF via Email" : "Confirm Physical Issuance"}
           </button>
         </div>
       </form>

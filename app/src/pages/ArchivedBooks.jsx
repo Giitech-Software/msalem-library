@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+// ✅ CHANGED: Using centralized API instance
+import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
 
 const ArchivedBooks = () => {
@@ -16,11 +17,8 @@ const ArchivedBooks = () => {
 
   const fetchArchivedBooks = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/api/books/archived", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token") || ""}`
-        }
-      });
+      // ✅ CHANGED: Using API instance (no manual headers needed)
+      const response = await API.get("/books/archived");
       setArchivedBooks(response.data);
     } catch (error) {
       console.error("Failed to fetch archived books:", error);
@@ -48,18 +46,15 @@ const ArchivedBooks = () => {
   const handleConfirmDelete = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(
-        `http://localhost:5000/api/books/delete/${selectedBookId}`,
-        { email: adminAuth.email, password: adminAuth.password },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token") || ""}`
-          }
-        }
+      // ✅ CHANGED: Using API instance for admin-validated delete
+      await API.post(
+        `/books/delete/${selectedBookId}`,
+        { email: adminAuth.email, password: adminAuth.password }
       );
       fetchArchivedBooks();
       closeDeleteModal();
     } catch (error) {
+      // The interceptor handles 401, but we keep the alert for 403 or bad credentials
       alert(error.response?.data?.message || "Authentication failed.");
     }
   };
@@ -79,7 +74,7 @@ const ArchivedBooks = () => {
             placeholder="Search archives by Title or ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full border-2 border-green-200 p-2 rounded-xl focus:border-green-600 outline-none shadow-sm font-bold text-sm"
+            className="w-full border-2 border-green-200 p-2 rounded-xl focus:border-green-600 outline-none shadow-sm font-bold text-sm bg-white"
           />
         </div>
       </div>
@@ -101,12 +96,12 @@ const ArchivedBooks = () => {
               const isDigital = book.bookType === 'Digital';
               return (
                 <tr key={book._id} className="hover:bg-gray-50 transition-colors">
-                  <td className="py-0.5 px-4">
+                  <td className="py-1 px-4">
                     <span className="text-[11px] font-black text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
                       {book.borrowerId || "NO-ID"}
                     </span>
                   </td>
-                  <td className="py-0.5 px-4">
+                  <td className="py-1 px-4">
                     <div className="font-black text-gray-800 text-sm uppercase leading-tight">{book.title}</div>
                     <div className="flex gap-2 mt-1">
                       <span className="text-[9px] font-bold text-gray-400 uppercase">{book.category}</span>
@@ -115,14 +110,14 @@ const ArchivedBooks = () => {
                       </span>
                     </div>
                   </td>
-                  <td className="py-0.5 px-4 font-bold text-gray-700 text-sm">{book.borrowerName}</td>
-                  <td className="py-0.5 px-4 text-center">
-  {/* CHANGE book.basePrice TO book.borrowingCost */}
-  <span className="text-sm font-black text-green-700">
-    ${book.borrowingCost || 0}
-  </span>
-</td>
-                  <td className="py-0.5 px-4 text-[11px] font-bold text-gray-500">
+                  <td className="py-1 px-4 font-bold text-gray-700 text-sm">{book.borrowerName}</td>
+                  <td className="py-1 px-4 text-center">
+                    {/* ✅ PRESERVED: Using borrowingCost */}
+                    <span className="text-sm font-black text-green-700">
+                      ${book.borrowingCost || 0}
+                    </span>
+                  </td>
+                  <td className="py-1 px-4 text-[11px] font-bold text-gray-500">
                     <div className="flex flex-col">
                       <span>Borrowed: {new Date(book.borrowedDate).toLocaleDateString()}</span>
                       <span className="text-green-600">
@@ -130,7 +125,7 @@ const ArchivedBooks = () => {
                       </span>
                     </div>
                   </td>
-                  <td className="py-0.5 px-4 text-center">
+                  <td className="py-1 px-4 text-center">
                     <button
                       onClick={() => openDeleteModal(book._id)}
                       className="bg-red-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] hover:bg-red-700 transition-all uppercase shadow-sm active:scale-95 tracking-tighter"
@@ -148,18 +143,18 @@ const ArchivedBooks = () => {
               Total Archived Records: {filteredBooks.length}
             </p>
             <p className="text-green-700 font-black text-[10px] uppercase">
-  {/* CHANGE b.basePrice TO b.borrowingCost */}
-  Historical Revenue: ${filteredBooks.reduce((sum, b) => sum + (b.borrowingCost || 0), 0)}
-</p>
+              {/* ✅ PRESERVED: Historical Revenue from borrowingCost */}
+              Historical Revenue: ${filteredBooks.reduce((sum, b) => sum + (b.borrowingCost || 0), 0)}
+            </p>
         </div>
       </div>
 
       {/* --- Delete Confirmation Modal --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-3 w-full max-w-md border-4 border-red-600">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border-4 border-red-600 animate-in zoom-in duration-200">
             <h2 className="text-2xl font-black text-red-600 mb-2 uppercase">Security Check</h2>
-            <p className="text-gray-600 mb-2 font-bold text-sm">This action is irreversible. Enter Admin credentials to delete this archive.</p>
+            <p className="text-gray-600 mb-6 font-bold text-sm">This action is irreversible. Enter Admin credentials to delete this archive.</p>
             
             <form onSubmit={handleConfirmDelete} className="space-y-4">
               <input

@@ -1,6 +1,6 @@
-// app/src/pages/StudentList.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+// ✅ CHANGED: Using centralized API instance
+import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
 
 const StudentList = () => {
@@ -29,21 +29,18 @@ const StudentList = () => {
 
   const allSubCategories = Object.values(categories).flat();
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token");
-    return { headers: { Authorization: `Bearer ${token}` } };
-  };
+  // ✅ REMOVED: getAuthHeaders (API instance now handles this automatically)
 
   useEffect(() => { fetchStudents(); }, []);
 
   const fetchStudents = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/students", getAuthHeaders());
+      // ✅ UPDATED: Using API instance
+      const res = await API.get("/students");
       setStudents(res.data);
     } catch (err) { console.error(err); }
   };
 
-  // ✅ UPDATED: Search now includes studentId
   const filteredStudents = students.filter(std => 
     std.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     std.subCategory.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -54,11 +51,12 @@ const StudentList = () => {
     e.preventDefault();
     const nameArray = bulkData.split(/[\n,]+/).map(n => n.trim()).filter(n => n);
     try {
-      await axios.post("http://localhost:5000/api/students/bulk", {
+      // ✅ UPDATED: Using API instance
+      await API.post("/students/bulk", {
         names: nameArray,
         category: form.category,
         subCategory: form.subCategory
-      }, getAuthHeaders());
+      });
       
       showStatus(`Successfully imported ${nameArray.length} students!`, "success");
       setBulkData("");
@@ -105,18 +103,21 @@ const StudentList = () => {
   const handleConfirmAction = async () => {
     try {
       if (modal.type === 'promote') {
-        const res = await axios.post("http://localhost:5000/api/students/promote", {
+        // ✅ UPDATED: Using API instance
+        const res = await API.post("/students/promote", {
           fromSubCategory: promo.from,
           toSubCategory: promo.to
-        }, getAuthHeaders());
+        });
         showStatus(res.data.message, "success");
       } else if (modal.type === 'graduate') {
-        const res = await axios.post("http://localhost:5000/api/students/graduate", {
+        // ✅ UPDATED: Using API instance
+        const res = await API.post("/students/graduate", {
           subCategory: gradClass
-        }, getAuthHeaders());
+        });
         showStatus(res.data.message, "success");
       } else if (modal.type === 'delete') {
-        await axios.delete(`http://localhost:5000/api/students/${modal.id}`, getAuthHeaders());
+        // ✅ UPDATED: Using API instance
+        await API.delete(`/students/${modal.id}`);
         showStatus("Student removed", "success");
       }
       fetchStudents();
@@ -134,7 +135,8 @@ const StudentList = () => {
 
   const handleUpdateStudent = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/students/${id}`, { name: editName }, getAuthHeaders());
+      // ✅ UPDATED: Using API instance
+      await API.put(`/students/${id}`, { name: editName });
       showStatus("Student updated", "success");
       setEditingId(null);
       fetchStudents();
@@ -179,7 +181,6 @@ const StudentList = () => {
           </div>
         )}
 
-        {/* ... (Bulk, Promote, Graduate views remain exactly the same) ... */}
         {view === "bulk" && (
           <div className="bg-white p-8 rounded-3xl shadow-xl border-t-8 border-yellow-500">
             <h2 className="text-xl font-bold mb-4">Paste Student Names</h2>
@@ -256,7 +257,6 @@ const StudentList = () => {
                       <>
                         <div className="flex items-center gap-2 mb-1">
                           <p className="font-bold text-gray-800">{std.name}</p>
-                          {/* ✅ NEW: Student ID Badge */}
                           {std.studentId && (
                             <span className="bg-green-100 text-green-700 text-[9px] font-black px-1.5 py-0.5 rounded border border-green-200 uppercase">
                               {std.studentId}
@@ -264,8 +264,6 @@ const StudentList = () => {
                           )}
                         </div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{std.category} • {std.subCategory}</p>
-                        
-                        {/* ✅ NEW: Contact Display */}
                         {std.contact && (
                           <p className="text-[10px] text-gray-500 italic mt-1 truncate">📞 {std.contact}</p>
                         )}
@@ -297,7 +295,6 @@ const StudentList = () => {
         )}
       </div>
 
-      {/* Modal remains same */}
       {modal.open && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-100 p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">

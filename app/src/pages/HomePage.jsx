@@ -29,7 +29,7 @@ const readingQuotesSource = [
   "⛈️ Reading is a discount ticket to everywhere — Mary Schmich."
 ];
 
-// 2. Shuffle function (Fisher-Yates algorithm for high quality shuffling)
+// 2. Shuffle function
 const shuffleArray = (array) => {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -40,13 +40,16 @@ const shuffleArray = (array) => {
 };
 
 const HomePage = () => {
-  // 3. Create a shuffled version of the quotes that persists for this session
   const shuffledQuotes = useMemo(() => shuffleArray(readingQuotesSource), []);
-  
   const [quoteIndex, setQuoteIndex] = useState(0);
-  const isLoggedIn = !!localStorage.getItem("token");
+  
+  // ✅ UPDATED: State-based auth check to ensure UI stays in sync
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("token"));
 
   useEffect(() => {
+    // Check login status whenever component mounts
+    setIsLoggedIn(!!localStorage.getItem("token"));
+
     const interval = setInterval(() => {
       setQuoteIndex((prevIndex) => (prevIndex + 1) % shuffledQuotes.length);
     }, 4000); 
@@ -93,7 +96,6 @@ const HomePage = () => {
         {/* Motivational Quote Section */}
         <div className="grow flex flex-col justify-center items-center text-center p-4 md:p-10">
           <div className="max-w-4xl w-full bg-white/70 p-4 md:p-8 rounded-4xl shadow-2xl border-2 border-blue-400 backdrop-blur-sm transition-all duration-500">
-            {/* Quote Text - 'key' helps React track the change for animations */}
             <h2 
               key={quoteIndex}
               className="text-lg md:text-4xl font-bold text-gray-800 mb-8 leading-tight italic min-h-[4em] flex items-center justify-center animate-fadeIn"
@@ -101,7 +103,6 @@ const HomePage = () => {
               {shuffledQuotes[quoteIndex]}
             </h2>
             
-            {/* Call to Action Badge */}
             <div className="inline-block bg-red-200 px-4 py-2 rounded-full border border-red-300">
                <p className="text-[11px] md:text-xs text-red-600 font-black animate-pulse uppercase tracking-[0.3em]">
                   🚀 Build your future by reading today.

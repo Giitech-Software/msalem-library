@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
-import axios from "axios";
+// ✅ Using centralized API instance
+import API from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton"; 
 
@@ -31,17 +32,14 @@ const AddBookCatalog = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Basic validation for Title since it's the primary identifier
     if (!form.title) {
         setStatus({ show: true, message: "Book Title is required to identify the entry.", type: "error" });
         return;
     }
 
-    const token = localStorage.getItem("token");
-
     try {
-      const existing = await axios.get(
-        `http://localhost:5000/api/bookCatalog/search?title=${encodeURIComponent(form.title)}`
+      const existing = await API.get(
+        `/bookCatalog/search?title=${encodeURIComponent(form.title)}`
       );
       
       if (existing.data && existing.data.length > 0) {
@@ -50,22 +48,27 @@ const AddBookCatalog = () => {
       }
 
       let payload;
-      let config = {
-        headers: { Authorization: `Bearer ${token}` }
+      let config = {}; 
+
+      // ✅ FINANCIAL UPDATE: Map basePrice to borrowingCost for the database
+      const financialData = {
+        ...form,
+        borrowingCost: form.basePrice // This ensures the amount is saved correctly
       };
 
       if (pdfFile) {
         payload = new FormData();
-        Object.keys(form).forEach(key => payload.append(key, form[key]));
+        Object.keys(financialData).forEach(key => payload.append(key, financialData[key]));
         payload.append("pdf", pdfFile);
         payload.append("bookType", "Digital");
         payload.set("totalQuantity", "999999"); 
-        config.headers["Content-Type"] = "multipart/form-data";
+        
+        config.headers = { "Content-Type": "multipart/form-data" };
       } else {
-        payload = { ...form, bookType: "Physical" };
+        payload = { ...financialData, bookType: "Physical" };
       }
 
-      await axios.post("http://localhost:5000/api/bookCatalog/add", payload, config);
+      await API.post("/bookCatalog/add", payload, config);
 
       setForm(initialFormState);
       setPdfFile(null);
@@ -77,9 +80,7 @@ const AddBookCatalog = () => {
       
     } catch (err) {
       console.error("Failed to add book:", err);
-      const errorMsg = err.response?.status === 401 
-        ? "Session expired. Please log in again." 
-        : "Error adding book. Ensure file is a valid PDF.";
+      const errorMsg = err.response?.data?.message || "Error adding book. Ensure file is a valid PDF.";
       setStatus({ show: true, message: errorMsg, type: "error" });
     }
   };

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+// ✅ CHANGED: Using centralized API instance
+import API from "../api/axiosInstance";
 import { ShieldCheck, Search, RefreshCcw, Clock } from "lucide-react"; 
 import BackButton from "../components/BackButton";
 
@@ -11,10 +12,8 @@ const SecurityLogs = () => {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5000/api/auth/logs", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // ✅ UPDATED: Using API instance (removes manual token and localhost URL)
+      const res = await API.get("/auth/logs");
       setLogs(res.data);
     } catch (err) {
       console.error("Failed to fetch logs:", err);
@@ -64,6 +63,7 @@ const SecurityLogs = () => {
             onClick={fetchLogs}
             className="p-2 bg-white border-2 border-green-200 rounded-xl hover:bg-green-50 text-green-700 transition-all shadow-sm"
             title="Refresh Logs"
+            disabled={loading}
           >
             <RefreshCcw size={20} className={loading ? "animate-spin" : ""} />
           </button>
@@ -74,7 +74,6 @@ const SecurityLogs = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              {/* Reduced header padding to py-0.5 */}
               <tr className="bg-green-800 text-yellow-300 uppercase text-[11px] tracking-widest">
                 <th className="py-2 px-4 border-b border-green-900">
                   <span className="flex items-center gap-2"><Clock size={12} /> Timestamp</span>
@@ -84,7 +83,6 @@ const SecurityLogs = () => {
                 <th className="py-2 px-4 border-b border-green-900">Action Details</th>
               </tr>
             </thead>
-            {/* Increased visibility row separators */}
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
@@ -95,7 +93,6 @@ const SecurityLogs = () => {
               ) : filteredLogs.length > 0 ? (
                 filteredLogs.map((log) => (
                   <tr key={log._id} className="hover:bg-yellow-50 transition-colors">
-                    {/* Applied compact py-0.5 to all cells */}
                     <td className="py-0.5 px-4 text-gray-500 font-mono text-[10px] whitespace-nowrap">
                       {new Date(log.createdAt).toLocaleString()}
                     </td>

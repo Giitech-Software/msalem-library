@@ -110,13 +110,13 @@ const SuperAdminFinance = () => {
           <tbody className="divide-y divide-gray-100">
             {filteredRecords.map((record) => (
               <tr key={record._id} className={`hover:bg-yellow-50 transition-colors ${record.isOrphaned ? 'bg-red-50' : ''}`}>
-                <td className="p-2 font-mono text-[10px] text-gray-500">
+                <td className="p-1 font-mono text-[10px] text-gray-500">
                   <div className="flex items-center gap-2">
                     <Calendar size={12} />
                     {new Date(record.date).toLocaleString()}
                   </div>
                 </td>
-                <td className="p-2">
+                <td className="p-1">
                   <div className="flex flex-col">
                     <span className="font-bold text-gray-800 flex items-center gap-1">
                       <User size={14} className="text-green-600" /> {record.borrowerName}
@@ -124,7 +124,7 @@ const SuperAdminFinance = () => {
                     <span className="text-[10px] text-gray-400 font-bold uppercase">{record.borrowerId || "No ID"}</span>
                   </div>
                 </td>
-                <td className="p-2">
+                <td className="p-1">
                   <div className="flex flex-col">
                     <span className="font-bold text-gray-700 text-sm flex items-center gap-1">
                       <BookOpen size={14} className="text-blue-500" /> {record.title}
@@ -134,15 +134,15 @@ const SuperAdminFinance = () => {
                     </span>
                   </div>
                 </td>
-                <td className="p-2">
+                <td className="p-1">
                   <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full font-black text-xs">
                     GHS {record.amount.toFixed(2)}
                   </span>
                 </td>
-                <td className="p-2 text-[11px] font-bold text-gray-600">
+                <td className="p-1 text-[11px] font-bold text-gray-600">
                   {record.issuedBy}
                 </td>
-                <td className="p-2 text-center">
+                <td className="p-1 text-center">
                   {record.isOrphaned ? (
                     <div className="flex items-center justify-center gap-1 text-red-600 animate-pulse">
                       <FileWarning size={16} />

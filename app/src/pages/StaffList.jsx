@@ -1,6 +1,6 @@
-// app/src/pages/StaffList.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+// ✅ CHANGED: Using centralized API instance
+import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
 
 const StaffList = () => {
@@ -16,24 +16,22 @@ const StaffList = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedStaffId, setSelectedStaffId] = useState(null);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token");
-    return { headers: { Authorization: `Bearer ${token}` } };
-  };
+  // ✅ REMOVED: getAuthHeaders (handled by API instance)
 
   useEffect(() => { fetchStaff(); }, []);
 
   const fetchStaff = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/staff", getAuthHeaders());
+      // ✅ UPDATED: Using API instance
+      const res = await API.get("/staff");
       setStaff(res.data);
     } catch (err) { 
       console.error("Failed to fetch staff:", err); 
-      if (err.response?.status === 401) showStatus("Session expired. Please log in.", "error");
+      // The interceptor in axiosInstance usually handles 401, 
+      // but we can keep a local fallback if needed.
     }
   };
 
-  // ✅ UPDATED: Search now includes staffId
   const filteredStaff = staff.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (s.staffId && s.staffId.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -43,7 +41,8 @@ const StaffList = () => {
     e.preventDefault();
     const names = bulkNames.split(/[\n,]+/).map(n => n.trim()).filter(n => n);
     try {
-      await axios.post("http://localhost:5000/api/staff/bulk", { names }, getAuthHeaders());
+      // ✅ UPDATED: Using API instance
+      await API.post("/staff/bulk", { names });
       showStatus(`Successfully added ${names.length} staff members!`, "success");
       setBulkNames("");
       setView("list");
@@ -65,7 +64,8 @@ const StaffList = () => {
 
   const confirmDelete = async () => {
     try {
-      await axios.delete(`http://localhost:5000/api/staff/${selectedStaffId}`, getAuthHeaders());
+      // ✅ UPDATED: Using API instance
+      await API.delete(`/staff/${selectedStaffId}`);
       showStatus("Staff member removed.", "success");
       fetchStaff();
       closeDeleteModal();
@@ -82,7 +82,8 @@ const StaffList = () => {
 
   const handleUpdate = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/staff/${id}`, { name: editName }, getAuthHeaders());
+      // ✅ UPDATED: Using API instance
+      await API.put(`/staff/${id}`, { name: editName });
       showStatus("Staff member updated!", "success");
       setEditingId(null);
       fetchStaff();
@@ -165,7 +166,6 @@ const StaffList = () => {
                       <>
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-bold text-gray-800 group-hover:text-green-700 transition">{s.name}</p>
-                          {/* ✅ NEW: Staff ID Badge */}
                           {s.staffId && (
                             <span className="bg-blue-100 text-blue-700 text-[9px] font-black px-1.5 py-0.5 rounded border border-blue-200 uppercase">
                               {s.staffId}
@@ -174,7 +174,6 @@ const StaffList = () => {
                         </div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Official Staff</p>
                         
-                        {/* ✅ NEW: Contact Display */}
                         {s.contact && (
                           <p className="text-[10px] text-gray-500 italic mt-1 truncate">📞 {s.contact}</p>
                         )}
@@ -213,7 +212,6 @@ const StaffList = () => {
         )}
       </div>
 
-      {/* Delete Modal remains the same */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">

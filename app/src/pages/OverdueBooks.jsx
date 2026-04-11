@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+// ✅ CHANGED: Using centralized API instance instead of raw axios
+import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
 
 const OverdueBooks = () => {
@@ -11,11 +12,8 @@ const OverdueBooks = () => {
   
   const [searchTerm, setSearchTerm] = useState("");
 
-  const axiosConfig = {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("token") || ""}`
-    }
-  };
+  // ✅ REMOVED: axiosConfig is no longer needed. 
+  // The API instance handles headers and baseURL automatically.
 
   useEffect(() => {
     fetchOverdue();
@@ -23,7 +21,8 @@ const OverdueBooks = () => {
 
   const fetchOverdue = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/books/overdue", axiosConfig);
+      // ✅ CHANGED: Using API instance
+      const res = await API.get("/books/overdue");
       setOverdueBooks(res.data);
     } catch (error) {
       console.error("Failed to fetch overdue books:", error);
@@ -31,7 +30,10 @@ const OverdueBooks = () => {
   };
 
   const handleExportPDF = () => {
-    window.open("http://localhost:5000/api/books/reports/overdue-books/pdf", "_blank");
+    // Note: window.open bypasses the Axios instance. 
+    // We add the token manually for the direct browser request.
+    const token = localStorage.getItem("token");
+    window.open(`http://localhost:5000/api/books/reports/overdue-books/pdf?token=${token}`, "_blank");
   };
 
   const handleSendReminder = async (book) => {
@@ -61,7 +63,8 @@ const OverdueBooks = () => {
     setStatus({ show: true, message: `Sending email to ${book.borrowerName}...`, type: "success" });
 
     try {
-      await axios.post(`http://localhost:5000/api/books/remind/${book._id}`, {}, axiosConfig);
+      // ✅ CHANGED: Using API instance
+      await API.post(`/books/remind/${book._id}`, {});
       setStatus({ show: true, message: "Reminder sent successfully!", type: "success" });
     } catch (err) {
       console.error("Reminder error:", err);
@@ -86,7 +89,8 @@ const OverdueBooks = () => {
     setStatus({ show: true, message: "Generating and sending full report...", type: "success" });
 
     try {
-      const res = await axios.get(`http://localhost:5000/api/books/reports/overdue-books/pdf?email=${emailAddress}`, axiosConfig);
+      // ✅ CHANGED: Using API instance
+      const res = await API.get(`/books/reports/overdue-books/pdf?email=${emailAddress}`);
       setStatus({ show: true, message: res.data.message, type: "success" });
       setEmailAddress(""); 
     } catch (err) {
@@ -102,7 +106,6 @@ const OverdueBooks = () => {
     (book.borrowerId && book.borrowerId.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // Total value calculation
   const totalOutstandingValue = filteredBooks.reduce((sum, b) => sum + (b.borrowingCost || 0), 0);
 
   return (

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+// ✅ CHANGED: Using centralized API instance
+import API from "../api/axiosInstance";
 import dayjs from "dayjs";
 import { jwtDecode } from "jwt-decode";
 import BackButton from "../components/BackButton";
@@ -11,24 +12,33 @@ const Statistics = () => {
   const [userRole, setUserRole] = useState("");
 
   useEffect(() => {
+    // We still decode the token locally to determine UI permissions (userRole)
     const token = localStorage.getItem("token");
+    let currentRole = "";
+    
     if (token) {
-      const decoded = jwtDecode(token);
-      setUserRole(decoded.role);
+      try {
+        const decoded = jwtDecode(token);
+        currentRole = decoded.role;
+        setUserRole(currentRole);
+      } catch (err) {
+        console.error("Invalid token found");
+      }
     }
 
     const fetchData = async () => {
       try {
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        const activeRes = await axios.get("http://localhost:5000/api/books/active");
-        const archivedRes = await axios.get("http://localhost:5000/api/books/archived");
+        // ✅ CHANGED: Using API instance for requests
+        // Manual config/headers are no longer needed
+        const activeRes = await API.get("/books/active");
+        const archivedRes = await API.get("/books/archived");
 
         setActiveBooks(activeRes.data);
         setArchivedBooks(archivedRes.data);
 
         // Fetch financials only for SuperAdmin
-        if (token && jwtDecode(token).role === "superadmin") {
-          const finRes = await axios.get("http://localhost:5000/api/auth/financials", config);
+        if (currentRole === "superadmin") {
+          const finRes = await API.get("/auth/financials");
           const total = finRes.data.reduce((sum, rec) => sum + (rec.amount || 0), 0);
           setTotalRevenue(total);
         }
@@ -77,7 +87,7 @@ const Statistics = () => {
 
       {/* 💰 Financial Vault (SuperAdmin Only) */}
       {userRole === "superadmin" && (
-        <div className="mb-10 bg-white border-2 border-green-700 p-2 rounded-2xl shadow-xl flex flex-col items-center justify-center">
+        <div className="mb-10 bg-white border-2 border-green-700 p-4 rounded-2xl shadow-xl flex flex-col items-center justify-center">
           <h2 className="text-green-700 text-xs font-black uppercase tracking-widest mb-1">Total Vault Revenue</h2>
           <p className="text-4xl font-black text-gray-800">GHS {totalRevenue.toFixed(2)}</p>
           <div className="mt-2 h-1 w-24 bg-yellow-400 rounded-full"></div>

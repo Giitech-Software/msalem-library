@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { ShieldAlert, UserPlus, Trash2, UserCheck, History, Users, Search } from "lucide-react"; 
+// ✅ CHANGED: Using centralized API instance
+import API from "../api/axiosInstance";
+import { ShieldAlert, UserPlus, Trash2, UserCheck, History, Users, Search, Eye, EyeOff } from "lucide-react"; 
 import BackButton from "../components/BackButton";
 
 const AdminManagement = () => {
@@ -12,13 +13,12 @@ const AdminManagement = () => {
   const [confirmModal, setConfirmModal] = useState({ show: false, id: null });
   const [newAdmin, setNewAdmin] = useState({ email: "", password: "", role: "admin" });
   const [searchQuery, setSearchQuery] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
+  // ✅ UPDATED: Using API instance (removes manual token/URL)
   const fetchAdmins = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5000/api/auth/users", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await API.get("/auth/users");
       setAdmins(res.data);
     } catch (err) {
       console.error("Fetch failed", err);
@@ -27,12 +27,10 @@ const AdminManagement = () => {
     }
   };
 
+  // ✅ UPDATED: Using API instance
   const fetchLogs = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5000/api/auth/logs", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await API.get("/auth/logs");
       setLogs(res.data);
     } catch (err) {
       console.error("Logs fetch failed", err);
@@ -44,13 +42,11 @@ const AdminManagement = () => {
     fetchLogs();
   }, []);
 
+  // ✅ UPDATED: Using API instance
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem("token");
-      await axios.post("http://localhost:5000/api/auth/register", newAdmin, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await API.post("/auth/register", newAdmin);
       setStatus({ show: true, message: "Admin Created Successfully!", type: "success" });
       setNewAdmin({ email: "", password: "", role: "admin" });
       fetchAdmins();
@@ -60,13 +56,11 @@ const AdminManagement = () => {
     }
   };
 
+  // ✅ UPDATED: Using API instance
   const handleToggleStatus = async (id, currentStatus) => {
     try {
-      const token = localStorage.getItem("token");
       const newStatus = currentStatus === "active" ? "suspended" : "active";
-      await axios.patch(`http://localhost:5000/api/auth/users/${id}`, { status: newStatus }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await API.patch(`/auth/users/${id}`, { status: newStatus });
       setStatus({ show: true, message: `Admin is now ${newStatus}`, type: "success" });
       fetchAdmins();
       fetchLogs();
@@ -75,12 +69,10 @@ const AdminManagement = () => {
     }
   };
 
+  // ✅ UPDATED: Using API instance
   const handleDelete = async (id) => {
     try {
-      const token = localStorage.getItem("token");
-      await axios.delete(`http://localhost:5000/api/auth/users/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await API.delete(`/auth/users/${id}`);
       setStatus({ show: true, message: "Admin Deleted", type: "success" });
       fetchAdmins();
       fetchLogs();
@@ -154,7 +146,22 @@ const AdminManagement = () => {
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase">Temporary Password</label>
-                <input type="password" required className="w-full p-2 border-2 border-gray-100 rounded-xl outline-green-500" value={newAdmin.password} onChange={(e) => setNewAdmin({...newAdmin, password: e.target.value})} />
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    required 
+                    className="w-full p-2 border-2 border-gray-100 rounded-xl outline-green-500 pr-10" 
+                    value={newAdmin.password} 
+                    onChange={(e) => setNewAdmin({...newAdmin, password: e.target.value})} 
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-green-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <button className="w-full bg-green-600 text-yellow-300 font-bold py-3 rounded-xl hover:bg-green-700 transition-all shadow-md active:scale-95">Confirm Registration</button>
             </form>
@@ -201,7 +208,7 @@ const AdminManagement = () => {
           </div>
         </div>
       ) : (
-        /* LOGS VIEW (Now Compact) */
+        /* LOGS VIEW */
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-yellow-200 animate-in slide-in-from-right duration-500 p-2">
           <div className="p-3 bg-gray-50 border-b font-black text-gray-600 text-xs flex justify-between items-center uppercase tracking-tighter">
             <span>System Audit Trail (Latest Actions)</span>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+// ✅ CHANGED: Using centralized API instance
+import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
 
 const ActiveBorrowedBooks = () => {
@@ -7,7 +8,6 @@ const ActiveBorrowedBooks = () => {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState({ show: false, message: "", type: "" });
   
-  // Modal State for Electron-friendly confirmation
   const [confirmModal, setConfirmModal] = useState({ show: false, id: null });
   
   const [tableSession, setTableSession] = useState(0);
@@ -23,11 +23,8 @@ const ActiveBorrowedBooks = () => {
 
   const fetchBooks = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/api/books/active", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token") || ""}`
-        }
-      });
+      // ✅ CHANGED: Using API instance
+      const response = await API.get("/books/active");
       setBooks(response.data);
       setTableSession(prev => prev + 1);
     } catch (error) {
@@ -44,9 +41,8 @@ const ActiveBorrowedBooks = () => {
 
   const handleReturn = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/books/return/${id}`, null, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }
-      });
+      // ✅ CHANGED: Using API instance
+      await API.put(`/books/return/${id}`, null);
       setStatus({ show: true, message: "Book marked as returned!", type: "success" });
       setConfirmModal({ show: false, id: null }); 
       fetchBooks();
@@ -58,13 +54,8 @@ const ActiveBorrowedBooks = () => {
 
   const handleConfirmDelete = async (id) => {
     try {
-      await axios.post(
-        `http://localhost:5000/api/books/delete/${id}`,
-        adminCreds,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }
-        }
-      );
+      // ✅ CHANGED: Using API instance
+      await API.post(`/books/delete/${id}`, adminCreds);
       setDeletingId(null);
       setAdminCreds({ email: "", password: "" });
       setStatus({ show: true, message: "Record deleted permanently.", type: "success" });
@@ -77,15 +68,10 @@ const ActiveBorrowedBooks = () => {
 
   const handleExportPDF = async () => {
     try {
-      const response = await axios.get(
-        "http://localhost:5000/api/books/reports/active-books/pdf",
-        {
-          responseType: "blob",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token") || ""}`
-          }
-        }
-      );
+      // ✅ CHANGED: Using API instance with responseType 'blob'
+      const response = await API.get("/books/reports/active-books/pdf", {
+        responseType: "blob"
+      });
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
@@ -93,6 +79,7 @@ const ActiveBorrowedBooks = () => {
       link.setAttribute("download", "active-books.pdf");
       document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link); // Cleanup
     } catch (error) {
       console.error("Export failed:", error);
       setStatus({ show: true, message: "Failed to export PDF.", type: "error" });
@@ -109,14 +96,8 @@ const ActiveBorrowedBooks = () => {
     setStatus({ show: true, message: "Sending email... please wait.", type: "success" });
 
     try {
-      const response = await axios.get(
-        `http://localhost:5000/api/books/reports/active-books/pdf?email=${emailAddress}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token") || ""}`
-          }
-        }
-      );
+      // ✅ CHANGED: Using API instance
+      const response = await API.get(`/books/reports/active-books/pdf?email=${emailAddress}`);
       
       setStatus({ show: true, message: response.data.message, type: "success" });
       setEmailAddress(""); 
@@ -136,18 +117,18 @@ const ActiveBorrowedBooks = () => {
       <BackButton label="⬅ Return to Dashboard" />
       
       {confirmModal.show && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-100 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border-4 border-green-600 animate-in zoom-in duration-200">
                 <h3 className="text-xl font-black text-green-800 mb-2 uppercase">Confirm Return</h3>
-                <p className="text-gray-600 font-bold mb-6">Are you sure you want to mark this book as returned to the library?</p>
+                <p className="text-gray-600 font-bold mb-6 text-sm">Are you sure you want to mark this book as returned to the library?</p>
                 <div className="flex gap-3">
                     <button 
                         onClick={() => handleReturn(confirmModal.id)}
-                        className="flex-1 bg-green-600 text-white py-2 rounded-xl font-black uppercase hover:bg-green-700 transition-colors"
+                        className="flex-1 bg-green-600 text-white py-2 rounded-xl font-black uppercase hover:bg-green-700 transition-colors text-xs"
                     >Yes, Return</button>
                     <button 
                         onClick={() => setConfirmModal({ show: false, id: null })}
-                        className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-xl font-black uppercase hover:bg-gray-300 transition-colors"
+                        className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-xl font-black uppercase hover:bg-gray-300 transition-colors text-xs"
                     >Cancel</button>
                 </div>
             </div>
@@ -158,7 +139,7 @@ const ActiveBorrowedBooks = () => {
         <div className={`fixed top-4 right-4 z-50 p-2 rounded-lg shadow-xl flex items-center gap-4 transition-all ${
           status.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
         }`}>
-          <span className="font-bold">{status.message}</span>
+          <span className="font-bold text-xs px-2">{status.message}</span>
           <button 
             onClick={() => setStatus({ show: false })}
             className="bg-black/20 hover:bg-black/40 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold transition-colors"
@@ -179,7 +160,7 @@ const ActiveBorrowedBooks = () => {
             value={search}
             autoComplete="off"
             onChange={(e) => setSearch(e.target.value)}
-            className="border-2 border-green-200 p-2 rounded-lg w-full max-w-70 focus:border-green-600 outline-none shadow-sm font-bold text-sm"
+            className="border-2 border-green-200 p-2 rounded-lg w-full max-w-70 focus:border-green-600 outline-none shadow-sm font-bold text-sm bg-white"
           />
           
           <div className="flex gap-2">
@@ -215,28 +196,27 @@ const ActiveBorrowedBooks = () => {
             {filteredBooks.map((book) => (
               <React.Fragment key={book._id}>
                 <tr className="hover:bg-yellow-50/50 transition-colors">
-                  <td className="py-0.5 px-4">
+                  <td className="py-1 px-4">
                     <span className="text-[11px] font-black text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full uppercase">
                       {book.borrowerId || "NO-ID"}
                     </span>
                   </td>
 
-                  <td className="py-0.5 px-4">
+                  <td className="py-1 px-4">
                     <div className="font-black text-gray-800 leading-tight text-sm">{book.title}</div>
                     <div className="text-[9px] text-gray-400 font-bold uppercase">
                       {book.category} • {book.subCategory}
                     </div>
                   </td>
 
-                  <td className="py-0.5 px-4">
+                  <td className="py-1 px-4">
                     <div className="font-bold text-gray-700 text-sm">{book.borrowerName}</div>
                   </td>
 
-                  <td className="py-0.5 px-4">
+                  <td className="py-1 px-4">
                     <div className="flex flex-col gap-1">
                       <div className="text-[10px] font-black">
                         <span className="text-gray-500 uppercase">Paid: </span>
-                        {/* ✅ UPDATED: Points to borrowingCost instead of basePrice */}
                         <span className={book.borrowingCost > 0 ? "text-green-700" : "text-blue-600"}>
                           ${book.borrowingCost || 0}
                         </span>
@@ -245,16 +225,11 @@ const ActiveBorrowedBooks = () => {
                         <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase text-white ${book.bookType === 'Digital' ? 'bg-blue-500' : 'bg-gray-500'}`}>
                           {book.bookType}
                         </span>
-                        {book.bookType === 'Digital' && (
-                           <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200 uppercase">
-                            Via {book.deliveryMethod || 'Email'}
-                           </span>
-                        )}
                       </div>
                     </div>
                   </td>
 
-                  <td className="py-0.5 px-4 text-[11px]">
+                  <td className="py-1 px-4 text-[11px]">
                     <div className="flex flex-col leading-tight">
                       <span className="text-gray-600 font-bold">OUT: {new Date(book.borrowedDate).toLocaleDateString()}</span>
                       <span className={book.bookType === 'Digital' ? "text-blue-600 font-black italic" : "text-red-600 font-black"}>
@@ -263,17 +238,17 @@ const ActiveBorrowedBooks = () => {
                     </div>
                   </td>
 
-                  <td className="py-0.5 px-4 text-center">
+                  <td className="py-1 px-4 text-center">
                     <div className="flex justify-center gap-2">
                       <button 
                         onClick={() => setConfirmModal({ show: true, id: book._id })} 
-                        className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] hover:bg-green-700 transition-all uppercase shadow-sm active:scale-95"
+                        className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] hover:bg-green-700 transition-all uppercase shadow-sm"
                       >
-                        Mark Returned
+                        Return
                       </button>
                       <button 
                         onClick={() => setDeletingId(deletingId === book._id ? null : book._id)} 
-                        className="bg-red-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] hover:bg-red-700 transition-all uppercase shadow-sm active:scale-95"
+                        className="bg-red-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] hover:bg-red-700 transition-all uppercase shadow-sm"
                       >
                         {deletingId === book._id ? "Cancel" : "Delete"}
                       </button>
@@ -284,11 +259,11 @@ const ActiveBorrowedBooks = () => {
                 {deletingId === book._id && (
                   <tr className="bg-red-50/50">
                     <td colSpan="6" className="p-2 border-l-4 border-red-600">
-                      <div className="flex flex-wrap items-center gap-2 justify-center">
-                        <span className="text-[9px] font-black text-red-700 uppercase italic">Admin Required:</span>
-                        <input type="email" placeholder="Email" className="border-2 p-1 text-[10px] rounded-md w-32 outline-none focus:border-red-600 font-bold" value={adminCreds.email} onChange={(e) => setAdminCreds({ ...adminCreds, email: e.target.value })} />
-                        <input type="password" placeholder="Pass" className="border-2 p-1 text-[10px] rounded-md w-32 outline-none focus:border-red-600 font-bold" value={adminCreds.password} onChange={(e) => setAdminCreds({ ...adminCreds, password: e.target.value })} />
-                        <button onClick={() => handleConfirmDelete(book._id)} className="bg-black text-white px-3 py-1 rounded text-[9px] font-black uppercase shadow-md hover:bg-red-600 transition-colors">Confirm Delete</button>
+                      <div className="flex flex-wrap items-center gap-2 justify-center py-2">
+                        <span className="text-[10px] font-black text-red-700 uppercase italic">Confirm Admin Creds:</span>
+                        <input type="email" placeholder="Admin Email" className="border-2 p-1.5 text-[10px] rounded-md w-36 outline-none focus:border-red-600 font-bold" value={adminCreds.email} onChange={(e) => setAdminCreds({ ...adminCreds, email: e.target.value })} />
+                        <input type="password" placeholder="Password" className="border-2 p-1.5 text-[10px] rounded-md w-36 outline-none focus:border-red-600 font-bold" value={adminCreds.password} onChange={(e) => setAdminCreds({ ...adminCreds, password: e.target.value })} />
+                        <button onClick={() => handleConfirmDelete(book._id)} className="bg-black text-white px-4 py-1.5 rounded text-[10px] font-black uppercase shadow-md hover:bg-red-600 transition-colors">Wipe Record</button>
                       </div>
                     </td>
                   </tr>

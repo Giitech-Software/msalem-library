@@ -1,6 +1,6 @@
-// app/src/pages/GeneralUserList.jsx
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+// ✅ CHANGED: Using centralized API instance
+import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
 
 const GeneralUserList = () => {
@@ -16,16 +16,14 @@ const GeneralUserList = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token");
-    return { headers: { Authorization: `Bearer ${token}` } };
-  };
+  // ✅ REMOVED: getAuthHeaders (API instance handles token injection automatically)
 
   useEffect(() => { fetchUsers(); }, []);
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/general", getAuthHeaders());
+      // ✅ UPDATED: Using API instance
+      const res = await API.get("/general");
       setUsers(res.data);
     } catch (err) {
       console.error("Fetch error:", err);
@@ -41,7 +39,8 @@ const GeneralUserList = () => {
     e.preventDefault();
     const names = bulkNames.split(/[\n,]+/).map(n => n.trim()).filter(n => n);
     try {
-      await axios.post("http://localhost:5000/api/general/bulk", { names, subCategory }, getAuthHeaders());
+      // ✅ UPDATED: Using API instance
+      await API.post("/general/bulk", { names, subCategory });
       showStatus(`Added ${names.length} users!`, "success");
       setBulkNames("");
       setView("list");
@@ -53,7 +52,8 @@ const GeneralUserList = () => {
 
   const handleUpdate = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/general/${id}`, { name: editName }, getAuthHeaders());
+      // ✅ UPDATED: Using API instance
+      await API.put(`/general/${id}`, { name: editName });
       showStatus("User updated!", "success");
       setEditingId(null);
       fetchUsers();
@@ -64,7 +64,8 @@ const GeneralUserList = () => {
 
   const confirmDelete = async () => {
     try {
-      await axios.delete(`http://localhost:5000/api/general/${selectedId}`, getAuthHeaders());
+      // ✅ UPDATED: Using API instance
+      await API.delete(`/general/${selectedId}`);
       showStatus("User removed.", "success");
       fetchUsers();
       setIsDeleteModalOpen(false);
@@ -73,7 +74,7 @@ const GeneralUserList = () => {
     }
   };
 
-  // ✅ UPDATED: Search includes borrowerId
+  // ✅ Search includes borrowerId
   const filteredUsers = users.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.borrowerId && u.borrowerId.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -123,7 +124,6 @@ const GeneralUserList = () => {
                       <>
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <p className="font-bold text-gray-800">{u.name}</p>
-                          {/* ✅ NEW: General ID Badge */}
                           {u.borrowerId && (
                             <span className="bg-blue-100 text-blue-700 text-[9px] font-black px-1.5 py-0.5 rounded border border-blue-200 uppercase">
                               {u.borrowerId}
@@ -132,7 +132,6 @@ const GeneralUserList = () => {
                         </div>
                         <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{u.subCategory || "General User"}</p>
                         
-                        {/* ✅ NEW: Contact Display */}
                         {u.contact && (
                           <p className="text-[10px] text-gray-500 italic mt-1 truncate">📞 {u.contact}</p>
                         )}

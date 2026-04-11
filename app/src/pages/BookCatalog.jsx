@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+// ✅ CHANGED: Using centralized API instance
+import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
 
 const BookCatalog = () => {
@@ -13,21 +14,16 @@ const BookCatalog = () => {
   const [selectedBookId, setSelectedBookId] = useState(null);
   const [adminAuth, setAdminAuth] = useState({ email: "", password: "" });
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token");
-    return { headers: { Authorization: `Bearer ${token || ""}` } };
-  };
-
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     try {
-      const config = getAuthHeaders();
+      // ✅ CHANGED: Using API instance (removes localhost prefix and manual headers)
       const [catRes, borrowRes] = await Promise.allSettled([
-        axios.get("http://localhost:5000/api/bookCatalog", config),
-        axios.get("http://localhost:5000/api/books/borrowed", config)
+        API.get("/bookCatalog"),
+        API.get("/books/borrowed")
       ]);
 
       if (catRes.status === 'fulfilled') setCatalog(catRes.value.data || []);
@@ -59,10 +55,10 @@ const BookCatalog = () => {
   const handleConfirmDelete = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(
-        `http://localhost:5000/api/bookCatalog/delete/${selectedBookId}`,
-        { email: adminAuth.email, password: adminAuth.password },
-        getAuthHeaders()
+      // ✅ CHANGED: Using API instance
+      await API.post(
+        `/bookCatalog/delete/${selectedBookId}`,
+        { email: adminAuth.email, password: adminAuth.password }
       );
       fetchData();
       closeDeleteModal();
@@ -73,7 +69,11 @@ const BookCatalog = () => {
 
   const handleEdit = (book) => {
     setEditing(book._id);
-    setEditForm(book);
+    // Ensure both price fields are present for the form logic
+    setEditForm({
+      ...book,
+      basePrice: book.borrowingCost || book.basePrice || "0"
+    });
   };
 
   const handleEditChange = (e) => {
@@ -84,11 +84,13 @@ const BookCatalog = () => {
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.put(
-        `http://localhost:5000/api/bookCatalog/${editing}`,
-        editForm,
-        getAuthHeaders()
-      );
+      // ✅ FINANCIAL UPDATE: Ensure borrowingCost is updated along with basePrice
+      const updatedData = {
+        ...editForm,
+        borrowingCost: editForm.basePrice 
+      };
+
+      await API.put(`/bookCatalog/${editing}`, updatedData);
       setEditing(null);
       fetchData();
     } catch (err) {
@@ -139,6 +141,9 @@ const BookCatalog = () => {
                 const total = book.totalQuantity || 0;
                 const available = total - borrowedCount;
                 const isDigital = book.bookType === 'Digital';
+                
+                // ✅ FINANCIAL UPDATE: Fallback logic for price display
+                const displayPrice = book.borrowingCost || book.basePrice || 0;
 
                 return (
                   <tr key={book._id} className="hover:bg-yellow-50/30 transition-colors">
@@ -190,7 +195,8 @@ const BookCatalog = () => {
                           </div>
                         </td>
                         <td className="py-0.5 px-4 text-center">
-                            <span className="text-sm font-black text-green-600">${book.basePrice || 0}</span>
+                            {/* ✅ FINANCIAL UPDATE: Updated to displayPrice variable */}
+                            <span className="text-sm font-black text-green-600">GHS {displayPrice}</span>
                         </td>
                         <td className="py-0.5 px-4 text-center">
                           <div className="flex flex-col items-center">

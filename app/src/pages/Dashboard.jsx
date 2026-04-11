@@ -2,7 +2,8 @@
 import React, { useEffect, useCallback, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
-import axios from "axios";
+// ✅ CHANGED: Using centralized API instance
+import API from "../api/axiosInstance";
 
 const Dashboard = () => {
   const location = useLocation();
@@ -52,9 +53,10 @@ const Dashboard = () => {
     navigate("/", { replace: true });
   }, [navigate]);
 
+  // ✅ UPDATED: Using API instance for secure calls
   const fetchOverdueCount = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/books/overdue");
+      const res = await API.get("/books/overdue");
       setOverdueCount(res.data.length);
     } catch (error) {
       console.error("Failed to fetch overdue count:", error);
@@ -76,10 +78,11 @@ const Dashboard = () => {
       handleLogout();
     }
 
+    // --- SECURITY TIMER LOGIC (MAINTAINED) ---
     let timer;
     const resetTimer = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(handleLogout, 5 * 60 * 1000);
+      timer = setTimeout(handleLogout, 5 * 60 * 1000); // 5 Minutes
     };
 
     const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart"];
@@ -103,7 +106,6 @@ const Dashboard = () => {
 
           <nav className="flex flex-col gap-1">
             {getFullMenu().map((item, index) => {
-              // ✅ Render section headers (non-clickable)
               if (item.isHeader) {
                 return (
                   <div
