@@ -1,28 +1,25 @@
 import React, { useEffect, useState } from "react";
-// ✅ CHANGED: Using centralized API instance instead of raw axios
 import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
 
 const OverdueBooks = () => {
   const [overdueBooks, setOverdueBooks] = useState([]);
   const [status, setStatus] = useState({ show: false, message: "", type: "" });
-  
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
-  
   const [searchTerm, setSearchTerm] = useState("");
-
-  // ✅ REMOVED: axiosConfig is no longer needed. 
-  // The API instance handles headers and baseURL automatically.
 
   useEffect(() => {
     fetchOverdue();
-  }, []);
+  }, [startDate, endDate]);
 
   const fetchOverdue = async () => {
     try {
-      // ✅ CHANGED: Using API instance
-      const res = await API.get("/books/overdue");
+      const res = await API.get("/books/overdue", {
+        params: { startDate, endDate }
+      });
       setOverdueBooks(res.data);
     } catch (error) {
       console.error("Failed to fetch overdue books:", error);
@@ -30,40 +27,31 @@ const OverdueBooks = () => {
   };
 
   const handleExportPDF = () => {
-    // Note: window.open bypasses the Axios instance. 
-    // We add the token manually for the direct browser request.
     const token = localStorage.getItem("token");
-    window.open(`http://localhost:5000/api/books/reports/overdue-books/pdf?token=${token}`, "_blank");
+    window.open(`http://localhost:5000/api/books/reports/overdue-books/pdf?token=${token}${startDate ? `&startDate=${startDate}` : ""}${endDate ? `&endDate=${endDate}` : ""}`, "_blank");
   };
 
   const handleSendReminder = async (book) => {
     const contact = book.contact?.trim();
-
     if (!contact) {
       setStatus({ show: true, message: "No contact info available.", type: "error" });
       setTimeout(() => setStatus({ show: false }), 4000);
       return;
     }
-
     const isPhone = /^\+?[0-9\s-]{7,15}$/.test(contact) && !contact.includes("@");
-
     if (isPhone) {
       window.location.href = `tel:${contact}`;
       setStatus({ show: true, message: `Opening dialer for ${book.borrowerName}...`, type: "success" });
       setTimeout(() => setStatus({ show: false }), 4000);
       return;
     }
-
     if (!contact.includes("@")) {
       setStatus({ show: true, message: "Invalid contact format.", type: "error" });
       setTimeout(() => setStatus({ show: false }), 4000);
       return;
     }
-
     setStatus({ show: true, message: `Sending email to ${book.borrowerName}...`, type: "success" });
-
     try {
-      // ✅ CHANGED: Using API instance
       await API.post(`/books/remind/${book._id}`, {});
       setStatus({ show: true, message: "Reminder sent successfully!", type: "success" });
     } catch (err) {
@@ -84,13 +72,12 @@ const OverdueBooks = () => {
       setTimeout(() => setStatus({ show: false }), 4000);
       return;
     }
-
     setShowEmailInput(false);
     setStatus({ show: true, message: "Generating and sending full report...", type: "success" });
-
     try {
-      // ✅ CHANGED: Using API instance
-      const res = await API.get(`/books/reports/overdue-books/pdf?email=${emailAddress}`);
+      const res = await API.get(`/books/reports/overdue-books/pdf`, {
+        params: { email: emailAddress, startDate, endDate }
+      });
       setStatus({ show: true, message: res.data.message, type: "success" });
       setEmailAddress(""); 
     } catch (err) {
@@ -124,55 +111,78 @@ const OverdueBooks = () => {
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <h1 className="text-3xl font-black text-red-600 uppercase tracking-tighter italic">
-          ⏰📕 Overdue Inventory Alert
+      <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+        <h1 className="text-3xl font-black text-red-600 uppercase tracking-tighter italic whitespace-nowrap">
+          ⏰📕 Overdue Inventory
         </h1>
 
-        <div className="flex-1 max-w-md w-full px-4">
-          <input
-            type="text"
-            placeholder="Search by Title, Name, or ID..."
-            className="w-full border-2 border-red-200 p-2 rounded-xl text-sm outline-none focus:border-red-500 font-bold shadow-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        <div className="flex flex-col items-end gap-2 w-full md:w-auto">
-          <div className="flex gap-3">
-            <button
-              onClick={handleExportPDF}
-              className="bg-red-600 text-white px-6 py-2 rounded-xl font-black hover:bg-red-700 transition shadow-lg uppercase text-xs tracking-widest active:scale-95"
-            >
-              Export PDF
-            </button>
-
-            <button
-              onClick={() => setShowEmailInput(!showEmailInput)}
-              className="bg-purple-600 text-white px-6 py-2 rounded-xl font-black hover:bg-purple-700 transition shadow-lg flex items-center gap-2 uppercase text-xs tracking-widest active:scale-95"
-            >
-              📧 {showEmailInput ? "Cancel" : "Send Full Report"}
-            </button>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {/* ✅ DATE FILTER WITH CLEAR BUTTON */}
+          <div className="flex items-center gap-2 bg-white p-1.5 rounded-lg border-2 border-red-100 shadow-sm">
+            <div className="flex flex-col">
+               <label className="text-[8px] font-black text-red-400 uppercase ml-1">From</label>
+               <input type="date" className="text-[10px] font-bold outline-none" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+            <div className="h-6 w-[2px] bg-red-50"></div>
+            <div className="flex flex-col">
+               <label className="text-[8px] font-black text-red-400 uppercase ml-1">To</label>
+               <input type="date" className="text-[10px] font-bold outline-none" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
+            {(startDate || endDate) && (
+              <button 
+                onClick={() => {setStartDate(""); setEndDate("");}} 
+                className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded font-black hover:bg-red-100 uppercase transition-colors"
+              >
+                Clear
+              </button>
+            )}
           </div>
 
+          <div className="w-48 lg:w-64">
+            <input
+              type="text"
+              placeholder="Search by Title, Borrower, or ID"
+              className="w-full border-2 border-red-200 p-2 rounded-xl text-xs outline-none focus:border-red-500 font-bold shadow-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="flex gap-2 relative">
+            <button
+              onClick={handleExportPDF}
+              className="bg-red-600 text-white px-4 py-2 rounded-xl font-black hover:bg-red-700 transition shadow-lg uppercase text-[10px] tracking-widest active:scale-95 flex items-center gap-2"
+            >
+              📄 PDF
+            </button>
+<button
+  onClick={() => {
+    setShowEmailInput(!showEmailInput);
+    if (showEmailInput) setEmailAddress(""); // Reset email when canceling
+  }}
+  className="bg-purple-600 text-white px-4 py-2 rounded-xl font-black hover:bg-purple-700 transition shadow-lg flex items-center gap-2 uppercase text-[10px] tracking-widest active:scale-95"
+>
+  📧 {showEmailInput ? "CANCEL" : "EMAIL"}
+</button>
+
           {showEmailInput && (
-            <div className="flex gap-2 p-2 bg-white rounded-2xl shadow-2xl border-2 border-purple-100 animate-in slide-in-from-right-5">
-              <input
-                type="email"
-                placeholder="Recipient Email"
-                className="border-2 border-gray-100 p-2 rounded-xl text-sm w-48 md:w-64 outline-none focus:border-purple-500 font-bold"
-                value={emailAddress}
-                onChange={(e) => setEmailAddress(e.target.value)}
-              />
-              <button
-                onClick={handleSendFullReport}
-                className="bg-purple-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase hover:bg-purple-700 transition"
-              >
-                Send
-              </button>
-            </div>
-          )}
+  <div className="absolute top-full right-0 mt-2 z-10 flex gap-2 p-2 bg-white rounded-2xl shadow-2xl border-2 border-purple-100 animate-in slide-in-from-top-2">
+    <input
+      type="email"
+      placeholder="Recipient Email"
+      className="border-2 border-gray-100 p-2 rounded-xl text-xs w-48 outline-none focus:border-purple-500 font-bold"
+      value={emailAddress}
+      onChange={(e) => setEmailAddress(e.target.value)}
+    />
+    <button
+      onClick={handleSendFullReport}
+      className="bg-purple-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-purple-700 transition"
+    >
+      Send
+    </button>
+  </div>
+)}
+          </div>
         </div>
       </div>
 
@@ -238,7 +248,7 @@ const OverdueBooks = () => {
         <div className="p-4 bg-red-50 rounded-b-xl flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-red-600 font-black text-[11px] uppercase flex items-center gap-2">
               <span className="animate-pulse text-lg">●</span> 
-              {filteredBooks.length} Overdue Records 
+              {filteredBooks.length} Overdue Records ● Follow up via Phone/Email
             </p>
             <div className="bg-white px-4 py-2 rounded-xl border-2 border-red-100 shadow-sm">
                 <span className="text-[10px] font-black text-gray-500 uppercase mr-2">Total At Risk Value:</span>

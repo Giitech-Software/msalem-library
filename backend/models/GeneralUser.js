@@ -1,3 +1,4 @@
+//backend/models/GeneralUser.js
 const mongoose = require("mongoose");
 
 const generalUserSchema = new mongoose.Schema({

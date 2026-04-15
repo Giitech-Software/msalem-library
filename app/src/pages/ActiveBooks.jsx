@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-// ✅ CHANGED: Using centralized API instance
+// ✅ Using centralized API instance
 import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
 
@@ -17,13 +17,16 @@ const ActiveBorrowedBooks = () => {
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
 
+  // ✅ ADDED: Date Range States
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   useEffect(() => {
     fetchBooks();
   }, []);
 
   const fetchBooks = async () => {
     try {
-      // ✅ CHANGED: Using API instance
       const response = await API.get("/books/active");
       setBooks(response.data);
       setTableSession(prev => prev + 1);
@@ -41,7 +44,6 @@ const ActiveBorrowedBooks = () => {
 
   const handleReturn = async (id) => {
     try {
-      // ✅ CHANGED: Using API instance
       await API.put(`/books/return/${id}`, null);
       setStatus({ show: true, message: "Book marked as returned!", type: "success" });
       setConfirmModal({ show: false, id: null }); 
@@ -54,7 +56,6 @@ const ActiveBorrowedBooks = () => {
 
   const handleConfirmDelete = async (id) => {
     try {
-      // ✅ CHANGED: Using API instance
       await API.post(`/books/delete/${id}`, adminCreds);
       setDeletingId(null);
       setAdminCreds({ email: "", password: "" });
@@ -66,26 +67,32 @@ const ActiveBorrowedBooks = () => {
     }
   };
 
+  // ✅ UPDATED: Export PDF with Date Range
   const handleExportPDF = async () => {
     try {
-      // ✅ CHANGED: Using API instance with responseType 'blob'
-      const response = await API.get("/books/reports/active-books/pdf", {
+      let query = "";
+      if (startDate && endDate) {
+        query = `?startDate=${startDate}&endDate=${endDate}`;
+      }
+
+      const response = await API.get(`/books/reports/active-books/pdf${query}`, {
         responseType: "blob"
       });
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", "active-books.pdf");
+      link.setAttribute("download", `active-books-${startDate || 'all'}.pdf`);
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link); // Cleanup
+      document.body.removeChild(link);
     } catch (error) {
       console.error("Export failed:", error);
       setStatus({ show: true, message: "Failed to export PDF.", type: "error" });
     }
   };
 
+  // ✅ UPDATED: Send Email with Date Range
   const handleSendEmail = async () => {
     if (!emailAddress) {
       setStatus({ show: true, message: "Please enter an email address.", type: "error" });
@@ -93,11 +100,15 @@ const ActiveBorrowedBooks = () => {
     }
 
     setShowEmailInput(false);
-    setStatus({ show: true, message: "Sending email... please wait.", type: "success" });
+    setStatus({ show: true, message: "Sending report... please wait.", type: "success" });
 
     try {
-      // ✅ CHANGED: Using API instance
-      const response = await API.get(`/books/reports/active-books/pdf?email=${emailAddress}`);
+      let query = `?email=${emailAddress}`;
+      if (startDate && endDate) {
+        query += `&startDate=${startDate}&endDate=${endDate}`;
+      }
+
+      const response = await API.get(`/books/reports/active-books/pdf${query}`);
       
       setStatus({ show: true, message: response.data.message, type: "success" });
       setEmailAddress(""); 
@@ -153,6 +164,22 @@ const ActiveBorrowedBooks = () => {
         </h1>
 
         <div className="flex flex-wrap items-center justify-end gap-3 flex-1">
+          {/* ✅ ADDED: Date Range Filter Section */}
+          <div className="flex items-center gap-2 bg-white p-1.5 rounded-lg border-2 border-yellow-300 shadow-sm">
+            <div className="flex flex-col">
+               <label className="text-[8px] font-black text-gray-400 uppercase ml-1">From</label>
+               <input type="date" className="text-[10px] font-bold outline-none" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+            <div className="h-6 w-[2px] bg-yellow-200"></div>
+            <div className="flex flex-col">
+               <label className="text-[8px] font-black text-gray-400 uppercase ml-1">To</label>
+               <input type="date" className="text-[10px] font-bold outline-none" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
+            {(startDate || endDate) && (
+              <button onClick={() => {setStartDate(""); setEndDate("");}} className="text-[10px] bg-gray-100 px-2 py-1 rounded font-black hover:bg-gray-200 uppercase">Clear</button>
+            )}
+          </div>
+
           <input
             key={`search-${tableSession}`}
             type="text"
@@ -160,7 +187,7 @@ const ActiveBorrowedBooks = () => {
             value={search}
             autoComplete="off"
             onChange={(e) => setSearch(e.target.value)}
-            className="border-2 border-green-200 p-2 rounded-lg w-full max-w-70 focus:border-green-600 outline-none shadow-sm font-bold text-sm bg-white"
+            className="border-2 border-green-200 p-2 rounded-lg w-full max-w-60 focus:border-green-600 outline-none shadow-sm font-bold text-sm bg-white"
           />
           
           <div className="flex gap-2">

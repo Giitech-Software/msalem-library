@@ -11,13 +11,16 @@ const ArchivedStudent = require('../models/ArchivedStudent');
 const BookCatalog = require('../models/BookCatalog'); // Library Inventory
 const Category = require('../models/Category'); // Dropdown Categories
 
+// ✅ NEW MODELS (based on your files)
+const FinancialRecord = require('../models/FinancialRecord');
+const GeneralUser = require('../models/GeneralUser');
+
 dotenv.config();
 
 const resetDevData = async () => {
   const target = process.argv[2]; 
 
   try {
-    // Check if URI exists to prevent silent crashes
     if (!process.env.MONGO_URI) {
       throw new Error("MONGO_URI not found in .env file");
     }
@@ -26,6 +29,7 @@ const resetDevData = async () => {
     console.log("📡 Connected to Database.");
 
     switch (target) {
+
       case 'students':
         await Student.deleteMany({});
         await ArchivedStudent.deleteMany({});
@@ -53,6 +57,18 @@ const resetDevData = async () => {
         console.log("✅ UI CLEANED: Book Catalog and Categories are now empty.");
         break;
 
+      // ✅ NEW: GeneralUserList.jsx
+      case 'users':
+        const userResult = await GeneralUser.deleteMany({});
+        console.log(`✅ UI CLEANED: General Users cleared (${userResult.deletedCount} removed).`);
+        break;
+
+      // ✅ NEW: SuperAdminFinance.jsx
+      case 'finance':
+        const financeResult = await FinancialRecord.deleteMany({});
+        console.log(`✅ UI CLEANED: Financial Records cleared (${financeResult.deletedCount} removed).`);
+        break;
+
       case 'all':
         console.log("⚠️  STARTING FULL DEVELOPMENT RESET...");
         
@@ -66,8 +82,14 @@ const resetDevData = async () => {
         // Wipe Inventory Data
         await BookCatalog.deleteMany({});
         await Category.deleteMany({});
+
+        // ✅ NEW: wipe General Users
+        await GeneralUser.deleteMany({});
+
+        // ✅ NEW: wipe Financial Records
+        await FinancialRecord.deleteMany({});
         
-        // Wipe User Data (PROTECT SUPERADMIN)
+        // Wipe Admins (PROTECT SUPERADMIN)
         const adminResult = await Admin.deleteMany({ role: { $ne: "superadmin" } });
         
         console.log(`🧹 Admin accounts cleared: ${adminResult.deletedCount} removed.`);
@@ -81,10 +103,13 @@ const resetDevData = async () => {
         console.log("   node scripts/resetUI.js logs      -> Clear Security Logs");
         console.log("   node scripts/resetUI.js borrowing -> Clear Borrowing Transactions");
         console.log("   node scripts/resetUI.js catalog   -> Clear Book Inventory & Categories");
+        console.log("   node scripts/resetUI.js users     -> Clear General Users");
+        console.log("   node scripts/resetUI.js finance   -> Clear Financial Records");
         console.log("   node scripts/resetUI.js all       -> Wipe Everything (Except Superadmin)");
     }
     
     process.exit(0);
+
   } catch (err) {
     console.error("❌ Reset Error:", err.message);
     process.exit(1);

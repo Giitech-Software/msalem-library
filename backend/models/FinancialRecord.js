@@ -1,3 +1,4 @@
+//backend/models/FinancialRecord.js
 const mongoose = require("mongoose");
 
 const financialRecordSchema = new mongoose.Schema({

@@ -24,7 +24,9 @@ const StudentList = () => {
     "Lower Primary": ["B1", "B2", "B3"],
     "Upper Primary": ["B4", "B5", "B6"],
     JHS: ["JHS1", "JHS2", "JHS3"],
-    SHS: ["SHS1", "SHS2", "SHS3"]
+    SHS: ["SHS1", "SHS2", "SHS3"],
+    // ✅ ADDED: Tertiary category and levels
+    Tertiary: ["Level 100", "Level 200", "Level 300", "Level 400", "Graduate"]
   };
 
   const allSubCategories = Object.values(categories).flat();

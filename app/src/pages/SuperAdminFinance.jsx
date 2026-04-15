@@ -1,3 +1,4 @@
+//app/src/pages/SuperAdminFinance.jsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { DollarSign, Search, FileWarning, Calendar, User, BookOpen, RefreshCw } from "lucide-react";
