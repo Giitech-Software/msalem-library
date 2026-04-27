@@ -1,8 +1,9 @@
+//src/api/axiosInstance.js
 import axios from "axios";
 
 // Create a custom version of axios
 const API = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: "http://127.0.0.1:5000/api",
 });
 
 // This part automatically adds your token to every request
@@ -21,7 +22,7 @@ API.interceptors.response.use(
     // 401 means the token is dead or invalid
     if (error.response && error.response.status === 401) {
       localStorage.removeItem("token"); // Clean up
-      
+
       // Redirect to login with a "reason" in the URL
       window.location.href = "/login?reason=expired";
     }

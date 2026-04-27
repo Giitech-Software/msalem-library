@@ -1,3 +1,4 @@
+//app/src/main.jsx
 import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { HashRouter as Router, useLocation } from "react-router-dom";

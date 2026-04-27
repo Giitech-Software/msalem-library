@@ -22,15 +22,23 @@
       "package.json",
       "!backend/**/*",
       "!app/node_modules/**/*",
-      "!app/package.json"
+      "!app/package.json",
+      "!app/src/**/*",
+      "!app/public/**/*"
     ],
     "extraResources": [
       {
         "from": "backend",
         "to": "backend",
         "filter": [
-          "**/*"
+          "**/*",
+          "!.env",
+          "!*.log"
         ]
+      },
+      {
+        "from": "backend/node_modules",
+        "to": "backend/node_modules"
       }
     ],
     "asar": true,
@@ -54,6 +62,7 @@
     }
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
     "express": "^4.22.1",

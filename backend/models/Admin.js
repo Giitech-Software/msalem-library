@@ -1,6 +1,6 @@
-//backend/models/Admin.js
+// backend/models/Admin.js
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs"); // ← changed from "bcrypt" to "bcryptjs"
 
 const adminSchema = new mongoose.Schema({
   email: {
@@ -14,13 +14,11 @@ const adminSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-
   role: {
     type: String,
     enum: ["superadmin", "admin"],
     default: "admin"
   },
-
   status: {
     type: String,
     enum: ["active", "suspended"],
