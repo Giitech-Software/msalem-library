@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 // ✅ CHANGED: Using centralized API instance
 import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
+import { formatCedi } from "../utils/currency";
 
 const BookCatalog = () => {
   const [catalog, setCatalog] = useState([]);
@@ -196,7 +197,7 @@ const BookCatalog = () => {
                         </td>
                         <td className="py-0.5 px-4 text-center">
                             {/* ✅ FINANCIAL UPDATE: Updated to displayPrice variable */}
-                            <span className="text-sm font-black text-green-600">GHS {displayPrice}</span>
+                            <span className="text-sm font-black text-green-600">{formatCedi(displayPrice)}</span>
                         </td>
                         <td className="py-0.5 px-4 text-center">
                           <div className="flex flex-col items-center">

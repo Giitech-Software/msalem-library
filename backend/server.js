@@ -98,8 +98,6 @@ const connectWithRetry = () => {
   });
 };
 
-
-
 connectWithRetry();
 
 process.on('SIGTERM', () => {

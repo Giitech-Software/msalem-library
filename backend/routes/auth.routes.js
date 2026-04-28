@@ -38,36 +38,46 @@ router.post('/register', auth, superAdmin, async (req, res) => {
 
 // ================= LOGIN =================
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const admin = await Admin.findOne({ email });
-  if (!admin) {
-    return res.status(400).json({ message: 'Invalid credentials' });
+    const admin = await Admin.findOne({ email });
+    if (!admin) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    if (admin.status === "suspended") {
+      return res.status(403).json({ message: "Account suspended" });
+    }
+
+    const isMatch = await admin.comparePassword(password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      console.error('Missing JWT_SECRET during admin login');
+      return res.status(500).json({ message: 'Server configuration error: JWT secret is missing.' });
+    }
+
+    // ✅ LOG LOGIN
+    await Log.create({
+      adminEmail: email,
+      action: "Login",
+      details: `Admin logged into the system`
+    });
+
+    const token = jwt.sign(
+      { id: admin._id, role: admin.role, email: admin.email }, // Added email to token
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    res.json({ token });
+  } catch (err) {
+    console.error('Admin login failed:', err);
+    res.status(500).json({ message: 'Server error during login' });
   }
-
-  if (admin.status === "suspended") {
-    return res.status(403).json({ message: "Account suspended" });
-  }
-
-  const isMatch = await admin.comparePassword(password);
-  if (!isMatch) {
-    return res.status(400).json({ message: 'Invalid credentials' });
-  }
-
-  // ✅ LOG LOGIN
-  await Log.create({
-    adminEmail: email,
-    action: "Login",
-    details: `Admin logged into the system`
-  });
-
-  const token = jwt.sign(
-    { id: admin._id, role: admin.role, email: admin.email }, // Added email to token
-    process.env.JWT_SECRET,
-    { expiresIn: '1d' }
-  );
-
-  res.json({ token });
 });
 
 // ================= ADMIN MANAGEMENT =================

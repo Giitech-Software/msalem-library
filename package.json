@@ -32,9 +32,17 @@
         "to": "backend",
         "filter": [
           "**/*",
-          "!.env",
+          ".env",
           "!*.log"
         ]
+      },
+      {
+        "from": "app/public/icon.ico",
+        "to": "assets/icon.ico"
+      },
+      {
+        "from": "app/public/icon.png",
+        "to": "assets/icon.png"
       },
       {
         "from": "backend/node_modules",
@@ -62,7 +70,7 @@
     }
   },
   "dependencies": {
-    "bcryptjs": "^3.0.3",
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
     "express": "^4.22.1",

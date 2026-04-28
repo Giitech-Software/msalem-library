@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import API from "../api/axiosInstance"; 
 import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton"; 
+import { CEDI_SYMBOL, formatCedi } from "../utils/currency";
 
 const BorrowBook = () => {
   const navigate = useNavigate();
@@ -233,7 +234,7 @@ const BorrowBook = () => {
                     Mode: {form.bookType}
                  </span>
                  <span className="text-[9px] font-black px-2 py-0.5 rounded bg-yellow-400 text-green-900 uppercase">
-                    Original Price: ${catalog.find(b => b.title === form.title)?.basePrice || 0}
+                    Original Price: {formatCedi(catalog.find(b => b.title === form.title)?.basePrice || 0)}
                  </span>
               </div>
             )}
@@ -270,7 +271,7 @@ const BorrowBook = () => {
             <div className="flex-1">
               <label className="text-[10px] font-black text-yellow-700 uppercase tracking-widest ml-1 block mb-1">Adjust Issuance Price</label>
               <div className="relative max-w-37.5">
-                <span className="absolute left-3 top-2 font-bold text-gray-500">$</span>
+                <span className="absolute left-3 top-2 font-bold text-gray-500">{CEDI_SYMBOL}</span>
                 <input 
                   type="number" 
                   name="basePrice" 

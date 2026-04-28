@@ -6,7 +6,39 @@ const fs = require('fs');
 
 // 1. VARIABLE DECLARATIONS
 let backendProcess;
+let mainWindow;
 const isDev = !app.isPackaged;
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
+
+function getWindowIconPath() {
+  const iconFileName = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+
+  if (isDev) {
+    return path.join(__dirname, '..', 'app', 'public', iconFileName);
+  }
+
+  return path.join(process.resourcesPath, 'assets', iconFileName);
+}
+
+function focusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  if (!mainWindow.isVisible()) {
+    mainWindow.show();
+  }
+
+  mainWindow.focus();
+}
 
 
 // --- 2. BACKEND PROCESS MANAGEMENT ---
@@ -52,6 +84,9 @@ function startBackend() {
       // NODE_PATH lets Node resolve modules from this folder
       NODE_PATH: nodeModulesPath,
       MONGO_URI: process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/msalem_library',
+      JWT_SECRET: process.env.JWT_SECRET,
+      EMAIL_USER: process.env.EMAIL_USER,
+      EMAIL_PASS: process.env.EMAIL_PASS,
     },
     cwd: backendCwd,
     stdio: 'inherit',
@@ -71,12 +106,9 @@ app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 function createWindow() {
-  // Resolve icon safely for both dev and production
-  const iconPath = isDev
-    ? path.join(__dirname, '..', 'app', 'public', 'icon.png')
-    : path.join(process.resourcesPath, 'app.asar.unpacked', 'app', 'dist', 'icon.png');
+  const iconPath = getWindowIconPath();
 
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     show: false,
@@ -93,36 +125,50 @@ function createWindow() {
   });
 
   if (isDev) {
-    win.loadURL('http://localhost:5173');
+    mainWindow.loadURL('http://localhost:5173');
   } else {
     // app/dist is bundled inside asar under app/dist/
-    win.loadFile(path.join(__dirname, '..', 'app', 'dist', 'index.html'));
+    mainWindow.loadFile(path.join(__dirname, '..', 'app', 'dist', 'index.html'));
   }
 
-  win.once('ready-to-show', () => {
-    win.maximize();
-    win.show();
-    win.focus();
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize();
+    mainWindow.show();
+    mainWindow.focus();
 
     setTimeout(() => {
-      if (!win.isDestroyed()) {
-        const [w, h] = win.getSize();
-        win.setSize(w, h - 1);
-        win.setSize(w, h);
+      if (!mainWindow.isDestroyed()) {
+        const [w, h] = mainWindow.getSize();
+        mainWindow.setSize(w, h - 1);
+        mainWindow.setSize(w, h);
       }
     }, 200);
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 }
 
 // --- 4. APP LIFECYCLE ---
-app.whenReady().then(() => {
-  startBackend();
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+app.on('second-instance', () => {
+  focusMainWindow();
 });
+
+if (gotSingleInstanceLock) {
+  app.whenReady().then(() => {
+    startBackend();
+    createWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      } else {
+        focusMainWindow();
+      }
+    });
+  });
+}
 
 app.on('window-all-closed', () => {
   if (backendProcess) backendProcess.kill();

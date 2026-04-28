@@ -1,6 +1,6 @@
 // backend/models/Admin.js
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs"); // ← changed from "bcrypt" to "bcryptjs"
+const bcrypt = require("bcrypt"); //
 
 const adminSchema = new mongoose.Schema({
   email: {
