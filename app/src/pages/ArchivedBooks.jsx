@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 // ✅ CHANGED: Using centralized API instance
 import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
-import { formatCedi } from "../utils/currency";
 
 const ArchivedBooks = () => {
   const [archivedBooks, setArchivedBooks] = useState([]);
@@ -115,7 +114,7 @@ const ArchivedBooks = () => {
                   <td className="py-1 px-4 text-center">
                     {/* ✅ PRESERVED: Using borrowingCost */}
                     <span className="text-sm font-black text-green-700">
-                      {formatCedi(book.borrowingCost || 0)}
+                      ${book.borrowingCost || 0}
                     </span>
                   </td>
                   <td className="py-1 px-4 text-[11px] font-bold text-gray-500">
@@ -145,7 +144,7 @@ const ArchivedBooks = () => {
             </p>
             <p className="text-green-700 font-black text-[10px] uppercase">
               {/* ✅ PRESERVED: Historical Revenue from borrowingCost */}
-              Historical Revenue: {formatCedi(filteredBooks.reduce((sum, b) => sum + (b.borrowingCost || 0), 0))}
+              Historical Revenue: ${filteredBooks.reduce((sum, b) => sum + (b.borrowingCost || 0), 0)}
             </p>
         </div>
       </div>

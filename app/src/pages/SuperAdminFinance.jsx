@@ -3,7 +3,6 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { DollarSign, Search, FileWarning, Calendar, User, BookOpen, RefreshCw } from "lucide-react";
 import BackButton from "../components/BackButton";
-import { formatCedi } from "../utils/currency";
 
 const SuperAdminFinance = () => {
   const [records, setRecords] = useState([]);
@@ -84,15 +83,15 @@ const SuperAdminFinance = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-2xl shadow-xl border-b-4 border-green-600">
           <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Total Revenue</p>
-          <h3 className="text-3xl font-black text-green-700">{formatCedi(stats.total)}</h3>
+          <h3 className="text-3xl font-black text-green-700">GHS {stats.total.toFixed(2)}</h3>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow-xl border-b-4 border-blue-600">
           <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Physical Book Fees</p>
-          <h3 className="text-3xl font-black text-blue-700">{formatCedi(stats.physical)}</h3>
+          <h3 className="text-3xl font-black text-blue-700">GHS {stats.physical.toFixed(2)}</h3>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow-xl border-b-4 border-purple-600">
           <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Digital Sales</p>
-          <h3 className="text-3xl font-black text-purple-700">{formatCedi(stats.digital)}</h3>
+          <h3 className="text-3xl font-black text-purple-700">GHS {stats.digital.toFixed(2)}</h3>
         </div>
       </div>
 
@@ -138,7 +137,7 @@ const SuperAdminFinance = () => {
                 </td>
                 <td className="p-1">
                   <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full font-black text-xs">
-                    {formatCedi(record.amount)}
+                    GHS {record.amount.toFixed(2)}
                   </span>
                 </td>
                 <td className="p-1 text-[11px] font-bold text-gray-600">

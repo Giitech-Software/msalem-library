@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
-import { formatCedi } from "../utils/currency";
 
 const OverdueBooks = () => {
   const [overdueBooks, setOverdueBooks] = useState([]);
@@ -232,7 +231,7 @@ const OverdueBooks = () => {
                 <td className="py-1 px-4">
                    <div className="flex flex-col">
                       <span className="text-[9px] text-gray-400 font-bold uppercase">Fees:</span>
-                      <span className="text-green-700 font-black text-sm">{formatCedi(book.borrowingCost || 0)}</span>
+                      <span className="text-green-700 font-black text-sm">${book.borrowingCost || 0}</span>
                    </div>
                 </td>
                 <td className="py-1 px-4">
@@ -253,7 +252,7 @@ const OverdueBooks = () => {
             </p>
             <div className="bg-white px-4 py-2 rounded-xl border-2 border-red-100 shadow-sm">
                 <span className="text-[10px] font-black text-gray-500 uppercase mr-2">Total At Risk Value:</span>
-                <span className="text-red-600 font-black text-lg">{formatCedi(totalOutstandingValue)}</span>
+                <span className="text-red-600 font-black text-lg">${totalOutstandingValue}</span>
             </div>
         </div>
       </div>

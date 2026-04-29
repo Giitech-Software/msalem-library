@@ -3,7 +3,6 @@ import React, { useState, useRef } from "react";
 import API from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton"; 
-import { CEDI_SYMBOL } from "../utils/currency";
 
 const AddBookCatalog = () => {
   const navigate = useNavigate();
@@ -183,7 +182,7 @@ const AddBookCatalog = () => {
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold text-blue-600 uppercase italic">Borrowing Cost ({CEDI_SYMBOL})</label>
+              <label className="text-xs font-bold text-blue-600 uppercase italic">Borrowing Cost ($)</label>
               <input 
                 type="number" 
                 name="basePrice" 
