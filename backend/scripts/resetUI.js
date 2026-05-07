@@ -1,116 +1,76 @@
-// backend/scripts/resetUI.js
-const mongoose = require('mongoose');
-const dotenv = require('dotenv');
+const path = require('path');
+const fs = require('fs');
+const Datastore = require('nedb-promises');
 
-// --- Import All Relevant Models ---
-const Admin = require('../models/Admin');
-const Book = require('../models/Book'); // Borrowing Transactions
-const Log = require('../models/Log');
-const Student = require('../models/Student');
-const Staff = require('../models/Staff');
-const ArchivedStudent = require('../models/ArchivedStudent');
-const BookCatalog = require('../models/BookCatalog'); // Library Inventory
-const Category = require('../models/Category'); // Dropdown Categories
-
-// ✅ NEW MODELS (based on your files)
-const FinancialRecord = require('../models/FinancialRecord');
-const GeneralUser = require('../models/GeneralUser');
-
-dotenv.config();
+// Helper to get the correct path to NeDB files
+const getDBPath = (fileName) => {
+  const dbDir = process.env.APPDATA 
+    ? path.join(process.env.APPDATA, 'msalem-library', 'database')
+    : path.join(require('os').homedir(), 'AppData', 'Roaming', 'msalem-library', 'database');
+    
+  return path.join(dbDir, fileName);
+};
 
 const resetDevData = async () => {
-  const target = process.argv[2]; 
+  const target = process.argv[2];
+  console.log(`📡 Targeting NeDB files in: ${path.dirname(getDBPath('admins.db'))}`);
 
   try {
-    if (!process.env.MONGO_URI) {
-      throw new Error("MONGO_URI not found in .env file");
-    }
-
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("📡 Connected to Database.");
+    // 1. Initialize Datastores
+    const dbs = {
+      students: Datastore.create(getDBPath('students.db')),
+      archivedStudents: Datastore.create(getDBPath('archived_students.db')),
+      staff: Datastore.create(getDBPath('staff.db')),
+      logs: Datastore.create(getDBPath('logs.db')),
+      borrowing: Datastore.create(getDBPath('books.db')),
+      catalog: Datastore.create(getDBPath('book_catalog.db')),
+      categories: Datastore.create(getDBPath('categories.db')),
+      users: Datastore.create(getDBPath('general_users.db')),
+      finance: Datastore.create(getDBPath('finance.db')),
+      admins: Datastore.create(getDBPath('admins.db'))
+    };
 
     switch (target) {
-
       case 'students':
-        await Student.deleteMany({});
-        await ArchivedStudent.deleteMany({});
-        console.log("✅ UI CLEANED: Student List and Archives are now empty.");
+        await dbs.students.remove({}, { multi: true });
+        await dbs.archivedStudents.remove({}, { multi: true });
+        console.log("✅ UI CLEANED: Students and Archives emptied.");
         break;
 
       case 'staff':
-        await Staff.deleteMany({});
-        console.log("✅ UI CLEANED: Staff List is now empty.");
+        await dbs.staff.remove({}, { multi: true });
+        console.log("✅ UI CLEANED: Staff List emptied.");
         break;
 
       case 'logs':
-        await Log.deleteMany({});
-        console.log("✅ UI CLEANED: Security Logs are now empty.");
-        break;
-
-      case 'borrowing':
-        await Book.deleteMany({});
-        console.log("✅ UI CLEANED: Active/Archived Books pages are now empty.");
+        await dbs.logs.remove({}, { multi: true });
+        console.log("✅ UI CLEANED: Security Logs emptied.");
         break;
 
       case 'catalog':
-        await BookCatalog.deleteMany({});
-        await Category.deleteMany({});
-        console.log("✅ UI CLEANED: Book Catalog and Categories are now empty.");
-        break;
-
-      // ✅ NEW: GeneralUserList.jsx
-      case 'users':
-        const userResult = await GeneralUser.deleteMany({});
-        console.log(`✅ UI CLEANED: General Users cleared (${userResult.deletedCount} removed).`);
-        break;
-
-      // ✅ NEW: SuperAdminFinance.jsx
-      case 'finance':
-        const financeResult = await FinancialRecord.deleteMany({});
-        console.log(`✅ UI CLEANED: Financial Records cleared (${financeResult.deletedCount} removed).`);
+        await dbs.catalog.remove({}, { multi: true });
+        await dbs.categories.remove({}, { multi: true });
+        console.log("✅ UI CLEANED: Catalog and Categories emptied.");
         break;
 
       case 'all':
-        console.log("⚠️  STARTING FULL DEVELOPMENT RESET...");
-        
-        // Wipe Transactional Data
-        await Log.deleteMany({});
-        await Book.deleteMany({});
-        await Student.deleteMany({});
-        await Staff.deleteMany({});
-        await ArchivedStudent.deleteMany({});
-        
-        // Wipe Inventory Data
-        await BookCatalog.deleteMany({});
-        await Category.deleteMany({});
-
-        // ✅ NEW: wipe General Users
-        await GeneralUser.deleteMany({});
-
-        // ✅ NEW: wipe Financial Records
-        await FinancialRecord.deleteMany({});
-        
-        // Wipe Admins (PROTECT SUPERADMIN)
-        const adminResult = await Admin.deleteMany({ role: { $ne: "superadmin" } });
-        
-        console.log(`🧹 Admin accounts cleared: ${adminResult.deletedCount} removed.`);
-        console.log("🔥 SUCCESS: All UI pages are wiped. Only your Superadmin remains.");
+        console.log("⚠️ STARTING FULL RESET...");
+        for (const key in dbs) {
+          if (key === 'admins') {
+            // PROTECT SUPERADMIN: Only delete standard admins
+            await dbs.admins.remove({ role: { $ne: "superadmin" } }, { multi: true });
+          } else {
+            await dbs[key].remove({}, { multi: true });
+          }
+        }
+        console.log("🔥 SUCCESS: All pages wiped. Only Superadmin remains.");
         break;
 
       default:
-        console.log("\n❌ Invalid Target. Please use one of the following:");
-        console.log("   node scripts/resetUI.js students  -> Clear Students & Archives");
-        console.log("   node scripts/resetUI.js staff     -> Clear Staff List");
-        console.log("   node scripts/resetUI.js logs      -> Clear Security Logs");
-        console.log("   node scripts/resetUI.js borrowing -> Clear Borrowing Transactions");
-        console.log("   node scripts/resetUI.js catalog   -> Clear Book Inventory & Categories");
-        console.log("   node scripts/resetUI.js users     -> Clear General Users");
-        console.log("   node scripts/resetUI.js finance   -> Clear Financial Records");
-        console.log("   node scripts/resetUI.js all       -> Wipe Everything (Except Superadmin)");
+        console.log("\n❌ Invalid Target. Use: students, staff, logs, catalog, or all.");
     }
     
     process.exit(0);
-
   } catch (err) {
     console.error("❌ Reset Error:", err.message);
     process.exit(1);

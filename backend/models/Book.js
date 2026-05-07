@@ -1,55 +1,103 @@
-//backend/models/Book.js
-const mongoose = require("mongoose");
+const Datastore = require('nedb-promises');
+const path = require('path');
+const { withoutEmptyId } = require('./utils');
 
-const bookSchema = new mongoose.Schema({
-  // --- EXISTING CORE FIELDS (Kept 100% Intact) ---
-  title: { type: String, required: true },
-  borrowerName: { type: String, required: true },
-  borrowerId: { type: String, required: true }, 
-  category: { type: String, required: true },
-  subCategory: { type: String, required: true },
-  borrowedDate: { type: Date, required: true },
-  returnDate: { type: Date, required: false },
-  contact: { type: String },
-  returned: {
-    type: Boolean,
-    default: false
-  },
+// Storage: books.db
+const dbPath = path.join(process.env.DATA_DIR || __dirname, 'books.db');
+const db = Datastore.create({ filename: dbPath, autoload: true });
 
-  // --- 🚀 ENTERPRISE & DIGITAL UPDATES ---
+// --- Standalone Indices ---
+// NeDB uses ensureIndex to keep searches fast for your reports
+db.ensureIndex({ fieldName: 'borrowerId' });
+db.ensureIndex({ fieldName: 'returned' });
+db.ensureIndex({ fieldName: 'bookType' });
 
-  // Distinguishes between a physical hand-off and a digital dispatch
-  bookType: { 
-    type: String, 
-    enum: ["Physical", "Digital"], 
-    default: "Physical" 
-  },
+class Book {
+  constructor(data) {
+    const borrowedDate = data.borrowedDate ? new Date(data.borrowedDate) : new Date();
+    const returnDate = data.returnDate ? new Date(data.returnDate) : null;
+    const createdAt = data.createdAt ? new Date(data.createdAt) : new Date();
+    const updatedAt = data.updatedAt ? new Date(data.updatedAt) : new Date();
 
-  // Stores the path to the PDF on the server (Only for Digital)
-  pdfUrl: { 
-    type: String, 
-    default: null 
-  },
+    // Core Fields
+    this.title = data.title;
+    this.borrowerName = data.borrowerName;
+    this.borrowerId = data.borrowerId;
+    this.category = data.category;
+    this.subCategory = data.subCategory;
+    this.borrowedDate = borrowedDate;
+    this.returnDate = returnDate;
+    this.contact = data.contact || "";
+    this.returned = data.returned !== undefined ? data.returned : false;
+    this.status = data.status || (this.returned ? "Returned" : "Borrowed");
 
-  // Enterprise Financial Tracking: Optional cost per transaction
-  borrowingCost: { 
-    type: Number, 
-    default: 0 
-  },
+    // Enterprise & Digital Fields
+    this.bookType = data.bookType || "Physical";
+    this.pdfUrl = data.pdfUrl || null;
+    this.borrowingCost = Number(data.borrowingCost) || 0;
+    this.dispatchStatus = data.dispatchStatus || "N/A";
 
-  // Status of the digital dispatch (Sent via WhatsApp/Email)
-  dispatchStatus: { 
-    type: String, 
-    enum: ["Pending", "Sent", "Failed", "N/A"], 
-    default: "N/A" 
+    // Timestamps
+    this.createdAt = createdAt;
+    this.updatedAt = updatedAt;
+    this._id = data._id || null;
   }
 
-}, { timestamps: true });
+  // Mimics Mongoose: await Book.find(query)
+  static async find(query = {}) {
+    const results = await db.find(query);
+    return results.map(data => new Book(data));
+  }
 
-// Existing Index for fast unreturned checks
-bookSchema.index({ borrowerId: 1, returned: 1 });
+  // Mimics Mongoose: await Book.findOne(query)
+  static async findOne(query) {
+    const data = await db.findOne(query);
+    return data ? new Book(data) : null;
+  }
 
-// ✅ NEW: Index for bookType to filter Digital vs Physical reports quickly
-bookSchema.index({ bookType: 1 });
+  // Mimics Mongoose: await Book.findById(id)
+  static async findById(id) {
+    const data = await db.findOne({ _id: id });
+    return data ? new Book(data) : null;
+  }
 
-module.exports = mongoose.model("Book", bookSchema);
+  // Mimics Mongoose: await Book.findByIdAndDelete(id)
+  static async findByIdAndDelete(id) {
+    return await db.remove({ _id: id });
+  }
+
+  // Mimics Mongoose: await Book.countDocuments(query)
+  static async countDocuments(query = {}) {
+    return await db.count(query);
+  }
+
+  // Mimics Mongoose: await Book.create(data)
+  static async create(data) {
+    const book = new Book(data);
+    const doc = await db.insert(withoutEmptyId(book));
+    return new Book(doc);
+  }
+
+  // Mimics Mongoose instance .save()
+  async save() {
+    this.updatedAt = new Date(); // Update the timestamp on every save
+    
+    if (this._id) {
+      await db.update({ _id: this._id }, { $set: this });
+      return this;
+    } else {
+      const doc = await db.insert(withoutEmptyId(this));
+      this._id = doc._id;
+      return this;
+    }
+  }
+
+  // Useful for Statistics.jsx: find by date range
+  static async findByDateRange(start, end) {
+    return await db.find({
+      borrowedDate: { $gte: start, $lte: end }
+    });
+  }
+}
+
+module.exports = Book;

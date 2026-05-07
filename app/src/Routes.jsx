@@ -1,3 +1,4 @@
+//app/src/Routes.jsx
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute"; 
@@ -22,6 +23,9 @@ import GeneralUserList from "./pages/GeneralUserList";
 // ✅ NEW: Import the Financial Vault Page
 import SuperAdminFinance from "./pages/SuperAdminFinance"; 
 
+// ✅ NEW: Import the User Manual Page
+import UserManual from "./pages/UserManual";
+
 const AppRoutes = () => {
   return (
     <Routes>
@@ -38,7 +42,7 @@ const AppRoutes = () => {
       <Route path="/statistics" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
       <Route path="/overdue" element={<ProtectedRoute><OverdueBooks /></ProtectedRoute>} />
       <Route path="/book-catalog" element={<ProtectedRoute><BookCatalog /></ProtectedRoute>} />
-      
+      <Route path="/user-manual" element={<ProtectedRoute><UserManual /></ProtectedRoute>} />
       {/* People Management */}
       <Route path="/students" element={<ProtectedRoute><StudentList /></ProtectedRoute>} />
       <Route path="/staff" element={<ProtectedRoute><StaffList /></ProtectedRoute>} />

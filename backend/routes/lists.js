@@ -1,4 +1,3 @@
-//backend/routes/lists.js
 const express = require("express");
 const router = express.Router();
 const Student = require("../models/Student");
@@ -8,96 +7,103 @@ const ArchivedStudent = require("../models/ArchivedStudent");
 const Log = require("../models/Log");
 const auth = require("../middleware/auth");
 
+function byName(a, b) {
+  return (a.name || "").localeCompare(b.name || "");
+}
+
+function normalizeName(name) {
+  return String(name || "").trim();
+}
+
 // --- STUDENT ROUTES ---
 
-// GET all students (Ordered Alphabetically)
+// GET all students
 router.get("/students", async (req, res) => {
   try {
-    // We explicitly sort by name, and Mongo will include studentId automatically 
-    // unless we tell it not to.
-    const students = await Student.find().sort({ name: 1 });
+    const students = await Student.find();
+    // NeDB find() returns array; manual sort for reliability
+    students.sort(byName);
     res.json(students);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch students" });
   }
 });
 
-// BULK INSERT students
+// BULK INSERT students (Refactored for NeDB)
 router.post("/students/bulk", auth, async (req, res) => {
   const { names, category, subCategory } = req.body;
-
   if (!names || !Array.isArray(names)) {
     return res.status(400).json({ message: "Invalid names list" });
   }
 
   try {
-    const studentDocs = names.map(name => ({
-      name,
-      category,
-      subCategory
-    }));
+    let count = 0;
+    for (const rawName of names) {
+      const name = normalizeName(rawName);
+      if (!name) continue;
+      // Check for duplicates manually to simulate {ordered: false}
+      const existing = await Student.findOne({ name, subCategory });
+      if (!existing) {
+        await Student.create({ name, category, subCategory });
+        count++;
+      }
+    }
 
-    await Student.insertMany(studentDocs, { ordered: false });
-
-    // ✅ AUDIT LOG
     await Log.create({
       adminEmail: req.admin.email,
       action: "Student Bulk Import",
-      details: `Imported ${names.length} students into ${category} (${subCategory})`
+      details: `Imported ${count} students into ${category} (${subCategory})`
     });
 
-    res.status(201).json({ message: "Bulk import successful" });
+    res.status(201).json({ message: "Bulk import successful", imported: count });
   } catch (err) {
-    if (err.code === 11000) {
-      return res.status(201).json({ message: "Import completed (Duplicates skipped)" });
-    }
     res.status(500).json({ message: "Bulk import failed", error: err.message });
   }
 });
 
-// UPDATE single student name
+// UPDATE single student
 router.put("/students/:id", auth, async (req, res) => {
   try {
     const { name } = req.body;
-    const oldStudent = await Student.findById(req.params.id);
-    const updatedStudent = await Student.findByIdAndUpdate(
-      req.params.id,
-      { name },
-      { new: true }
-    );
+    const student = await Student.findById(req.params.id);
+    if (!student) return res.status(404).json({ message: "Student not found" });
 
-    // ✅ AUDIT LOG
+    const oldName = student.name;
+    student.name = name;
+    await student.save();
+
     await Log.create({
       adminEmail: req.admin.email,
       action: "Student Update",
-      details: `Renamed "${oldStudent.name}" to "${name}"`
+      details: `Renamed "${oldName}" to "${name}"`
     });
 
-    res.json(updatedStudent);
+    res.json(student);
   } catch (err) {
     res.status(500).json({ message: "Update failed", error: err.message });
   }
 });
 
-// PROMOTE students
+// PROMOTE students (Refactored: No updateMany in NeDB)
 router.post("/students/promote", auth, async (req, res) => {
   const { fromSubCategory, toSubCategory } = req.body;
   try {
-    const result = await Student.updateMany(
-      { subCategory: fromSubCategory },
-      { $set: { subCategory: toSubCategory } }
-    );
+    const students = await Student.find({ subCategory: fromSubCategory });
+    
+    for (let student of students) {
+      student.subCategory = toSubCategory;
+      await student.save();
+    }
 
-    // ✅ AUDIT LOG
     await Log.create({
       adminEmail: req.admin.email,
       action: "Class Promotion",
-      details: `Promoted ${result.modifiedCount} students from ${fromSubCategory} to ${toSubCategory}`
+      details: `Promoted ${students.length} students from ${fromSubCategory} to ${toSubCategory}`
     });
 
     res.json({ 
-      message: `Successfully promoted ${result.modifiedCount} students from ${fromSubCategory} to ${toSubCategory}.`,
-      count: result.modifiedCount 
+      message: `Successfully promoted ${students.length} students.`,
+      count: students.length 
     });
   } catch (err) {
     res.status(500).json({ message: "Promotion failed", error: err.message });
@@ -112,7 +118,6 @@ router.delete("/students/:id", auth, async (req, res) => {
 
     await Student.findByIdAndDelete(req.params.id);
 
-    // ✅ AUDIT LOG
     await Log.create({
       adminEmail: req.admin.email,
       action: "Student Deletion",
@@ -131,168 +136,158 @@ router.post("/students/graduate", auth, async (req, res) => {
   try {
     const graduatingStudents = await Student.find({ subCategory });
     if (graduatingStudents.length === 0) {
-      return res.status(404).json({ message: "No students found in this class to graduate." });
+      return res.status(404).json({ message: "No students found to graduate." });
     }
-    const archiveData = graduatingStudents.map(s => ({
-      name: s.name,
-      category: s.category,
-      subCategory: s.subCategory
-    }));
     
-    await ArchivedStudent.insertMany(archiveData);
-    const result = await Student.deleteMany({ subCategory });
+    for (let s of graduatingStudents) {
+      await ArchivedStudent.create({
+        name: s.name,
+        category: s.category,
+        subCategory: s.subCategory,
+        graduatedDate: new Date()
+      });
+      await Student.findByIdAndDelete(s._id);
+    }
 
-    // ✅ AUDIT LOG
     await Log.create({
       adminEmail: req.admin.email,
       action: "Class Graduation",
-      details: `Graduated and archived ${result.deletedCount} students from class ${subCategory}`
+      details: `Graduated and archived ${graduatingStudents.length} students from ${subCategory}`
     });
 
-    res.json({ 
-      message: `Successfully graduated ${result.deletedCount} students from ${subCategory}.`,
-      count: result.deletedCount 
-    });
+    res.json({ message: "Graduation successful", count: graduatingStudents.length });
   } catch (err) {
-    res.status(500).json({ message: "Graduation process failed", error: err.message });
+    res.status(500).json({ message: "Graduation failed", error: err.message });
   }
 });
 
 // --- STAFF ROUTES ---
 
-// GET all staff
 router.get("/staff", async (req, res) => {
   try {
-    const staff = await Staff.find().sort({ name: 1 });
+    const staff = await Staff.find();
+    staff.sort(byName);
     res.json(staff);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch staff" });
   }
 });
 
-// BULK INSERT staff
 router.post("/staff/bulk", auth, async (req, res) => {
   const { names } = req.body;
   if (!names || !Array.isArray(names)) {
     return res.status(400).json({ message: "Invalid names list" });
   }
+
   try {
-    const staffDocs = names.map(name => ({ name }));
-    await Staff.insertMany(staffDocs, { ordered: false });
-
-    // ✅ AUDIT LOG
-    await Log.create({
-      adminEmail: req.admin.email,
-      action: "Staff Bulk Import",
-      details: `Imported ${names.length} staff members into the system.`
-    });
-
-    res.status(201).json({ message: "Staff bulk import successful" });
-  } catch (err) {
-    if (err.code === 11000) {
-      return res.status(201).json({ message: "Import completed (Duplicates skipped)" });
+    let count = 0;
+    for (const rawName of names) {
+      const name = normalizeName(rawName);
+      if (!name) continue;
+      const exists = await Staff.findOne({ name });
+      if (!exists) {
+        await Staff.create({ name });
+        count++;
+      }
     }
-    res.status(500).json({ message: "Bulk import failed" });
-  }
+    await Log.create({ adminEmail: req.admin.email, action: "Staff Bulk Import", details: `Imported ${count} staff.` });
+    res.status(201).json({ message: "Staff bulk import successful" });
+  } catch (err) { res.status(500).json({ message: "Bulk import failed", error: err.message }); }
 });
 
-// UPDATE single staff member
 router.put("/staff/:id", auth, async (req, res) => {
   try {
-    const { name } = req.body;
-    const oldStaff = await Staff.findById(req.params.id);
-    const updatedStaff = await Staff.findByIdAndUpdate(
-      req.params.id,
-      { name },
-      { new: true }
-    );
+    const staff = await Staff.findById(req.params.id);
+    if (!staff) return res.status(404).json({ message: "Staff member not found" });
+    const oldName = staff.name;
+    staff.name = req.body.name;
+    await staff.save();
+    await Log.create({ adminEmail: req.admin.email, action: "Staff Update", details: `Renamed ${oldName} to ${req.body.name}` });
+    res.json(staff);
+  } catch (err) { res.status(500).json({ message: "Update failed", error: err.message }); }
+});
 
-    // ✅ AUDIT LOG
+router.delete("/staff/:id", auth, async (req, res) => {
+  try {
+    const staff = await Staff.findById(req.params.id);
+    if (!staff) return res.status(404).json({ message: "Staff member not found" });
+    await Staff.findByIdAndDelete(req.params.id);
+    await Log.create({ adminEmail: req.admin.email, action: "Staff Deletion", details: `Removed: ${staff.name}` });
+    res.json({ message: "Staff removed" });
+  } catch (err) { res.status(500).json({ message: "Delete failed", error: err.message }); }
+});
+
+// --- GENERAL USER ROUTES ---
+
+router.get("/general", async (req, res) => {
+  try {
+    const users = await GeneralUser.find();
+    users.sort(byName);
+    res.json(users);
+  } catch (err) { res.status(500).json({ message: "Failed to fetch general users" }); }
+});
+
+router.post("/general/bulk", auth, async (req, res) => {
+  const { names, subCategory } = req.body;
+  if (!names || !Array.isArray(names)) {
+    return res.status(400).json({ message: "Invalid names list" });
+  }
+
+  try {
+    let count = 0;
+    for (const rawName of names) {
+      const name = normalizeName(rawName);
+      if (!name) continue;
+      const exists = await GeneralUser.findOne({ name, subCategory });
+      if (!exists) {
+        await GeneralUser.create({ name, subCategory });
+        count++;
+      }
+    }
+    await Log.create({ adminEmail: req.admin.email, action: "General User Bulk Import", details: `Imported ${count} users.` });
+    res.status(201).json({ message: "Import successful" });
+  } catch (err) { res.status(500).json({ message: "Bulk import failed", error: err.message }); }
+});
+
+router.put("/general/:id", auth, async (req, res) => {
+  try {
+    const user = await GeneralUser.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const oldName = user.name;
+    user.name = normalizeName(req.body.name);
+    if (req.body.subCategory !== undefined) user.subCategory = req.body.subCategory;
+    if (req.body.contact !== undefined) user.contact = req.body.contact;
+    await user.save();
+
     await Log.create({
       adminEmail: req.admin.email,
-      action: "Staff Update",
-      details: `Updated staff member name from "${oldStaff.name}" to "${name}"`
+      action: "General User Update",
+      details: `Renamed ${oldName} to ${user.name}`
     });
 
-    res.json(updatedStaff);
+    res.json(user);
   } catch (err) {
     res.status(500).json({ message: "Update failed", error: err.message });
   }
 });
 
-// DELETE single staff member
-router.delete("/staff/:id", auth, async (req, res) => {
+router.delete("/general/:id", auth, async (req, res) => {
   try {
-    const staff = await Staff.findById(req.params.id);
-    if (!staff) return res.status(404).json({ message: "Staff member not found" });
+    const user = await GeneralUser.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    await Staff.findByIdAndDelete(req.params.id);
-
-    // ✅ AUDIT LOG
+    await GeneralUser.findByIdAndDelete(req.params.id);
     await Log.create({
       adminEmail: req.admin.email,
-      action: "Staff Deletion",
-      details: `Removed staff member: "${staff.name}"`
+      action: "General User Deletion",
+      details: `Removed: ${user.name}`
     });
 
-    res.json({ message: "Staff member removed successfully" });
+    res.json({ message: "User removed" });
   } catch (err) {
     res.status(500).json({ message: "Delete failed", error: err.message });
   }
 });
 
-// --- GENERAL USER ROUTES ---
-
-// GET all general users
-router.get("/general", async (req, res) => {
-  try {
-    const users = await GeneralUser.find().sort({ name: 1 });
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to fetch general users" });
-  }
-});
-
-// BULK INSERT general users
-router.post("/general/bulk", auth, async (req, res) => {
-  const { names, subCategory } = req.body;
-  if (!names || !Array.isArray(names)) return res.status(400).json({ message: "Invalid names list" });
-
-  try {
-    const userDocs = names.map(name => ({ name, subCategory }));
-    await GeneralUser.insertMany(userDocs, { ordered: false });
-
-    await Log.create({
-      adminEmail: req.admin.email,
-      action: "General User Bulk Import",
-      details: `Imported ${names.length} general users into ${subCategory}`
-    });
-
-    res.status(201).json({ message: "Import successful" });
-  } catch (err) {
-    if (err.code === 11000) return res.status(201).json({ message: "Import completed (Duplicates skipped)" });
-    res.status(500).json({ message: "Bulk import failed" });
-  }
-});
-
-// UPDATE general user
-router.put("/general/:id", auth, async (req, res) => {
-  try {
-    const { name } = req.body;
-    const updated = await GeneralUser.findByIdAndUpdate(req.params.id, { name }, { new: true });
-    res.json(updated);
-  } catch (err) {
-    res.status(500).json({ message: "Update failed" });
-  }
-});
-
-// DELETE general user
-router.delete("/general/:id", auth, async (req, res) => {
-  try {
-    await GeneralUser.findByIdAndDelete(req.params.id);
-    res.json({ message: "User removed" });
-  } catch (err) {
-    res.status(500).json({ message: "Delete failed" });
-  }
-});
 module.exports = router;

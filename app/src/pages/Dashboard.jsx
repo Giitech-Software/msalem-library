@@ -30,7 +30,8 @@ const Dashboard = () => {
     // 📊 MONITORING
     { name: "📊 MONITORING", isHeader: true },
     { name: "⏰ Overdue Books", path: "/overdue", showBadge: true },
-    { name: "📊 Statistics", path: "/statistics" }
+    { name: "📊 Statistics", path: "/statistics" },
+    { name: "📖 User Manual", path: "/user-manual" }, // 👈 ADD THIS LINE
   ];
 
   const getFullMenu = () => {

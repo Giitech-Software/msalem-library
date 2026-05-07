@@ -1,45 +1,48 @@
-//backend/routes/auth.routes.js
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
-const Log = require('../models/Log'); // ✅ NEW IMPORT
+const Log = require('../models/Log');
 
 const auth = require("../middleware/auth");
 const superAdmin = require("../middleware/superAdmin");
-const FinancialRecord = require("../models/FinancialRecord"); // ✅ ADD THIS
+const FinancialRecord = require("../models/FinancialRecord");
 const router = express.Router();
 
 // ================= REGISTER =================
 router.post('/register', auth, superAdmin, async (req, res) => {
-  const { email, password, role } = req.body;
+  try {
+    const { password, role } = req.body;
+    const email = req.body.email?.trim().toLowerCase();
 
-  const existing = await Admin.findOne({ email });
-  if (existing) {
-    return res.status(400).json({ message: 'Admin already exists' });
+    const existing = await Admin.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ message: 'Admin already exists' });
+    }
+
+    // Our new standalone model uses .create() to handle hashing and saving
+    await Admin.create({
+      email,
+      password,
+      role: role || "admin"
+    });
+
+    await Log.create({
+      adminEmail: req.admin.email || "Superadmin", 
+      action: "Admin Registration",
+      details: `Registered new account: ${email} as ${role || "admin"}`
+    });
+
+    res.json({ message: 'Admin created' });
+  } catch (err) {
+    res.status(500).json({ message: "Registration failed" });
   }
-
-  const newAdmin = new Admin({
-    email,
-    password,
-    role: role || "admin"
-  });
-
-  await newAdmin.save();
-
-  // ✅ LOG ACTION
-  await Log.create({
-    adminEmail: req.admin.email || "Superadmin", 
-    action: "Admin Registration",
-    details: `Registered new account: ${email} as ${role || "admin"}`
-  });
-
-  res.json({ message: 'Admin created' });
 });
 
 // ================= LOGIN =================
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = req.body.email?.trim().toLowerCase();
 
     const admin = await Admin.findOne({ email });
     if (!admin) {
@@ -50,32 +53,34 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ message: "Account suspended" });
     }
 
+    // uses the method inside the Admin class instance
     const isMatch = await admin.comparePassword(password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
     if (!process.env.JWT_SECRET) {
-      console.error('Missing JWT_SECRET during admin login');
-      return res.status(500).json({ message: 'Server configuration error: JWT secret is missing.' });
+      return res.status(500).json({ message: 'Server configuration error' });
     }
 
-    // ✅ LOG LOGIN
-    await Log.create({
-      adminEmail: email,
-      action: "Login",
-      details: `Admin logged into the system`
-    });
+    try {
+      await Log.create({
+        adminEmail: email,
+        action: "Login",
+        details: `Admin logged into the system`
+      });
+    } catch (logErr) {
+      console.error("Login audit log failed:", logErr.message);
+    }
 
     const token = jwt.sign(
-      { id: admin._id, role: admin.role, email: admin.email }, // Added email to token
+      { id: admin._id, role: admin.role, email: admin.email },
       process.env.JWT_SECRET,
       { expiresIn: '1d' }
     );
 
     res.json({ token });
   } catch (err) {
-    console.error('Admin login failed:', err);
     res.status(500).json({ message: 'Server error during login' });
   }
 });
@@ -84,8 +89,10 @@ router.post('/login', async (req, res) => {
 
 router.get("/users", auth, superAdmin, async (req, res) => {
   try {
-    const users = await Admin.find().select("-password");
-    res.json(users);
+    const users = await Admin.find();
+    // Use our toPublic() helper to hide passwords
+    const publicUsers = users.map(u => u.toPublic());
+    res.json(publicUsers);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch users" });
   }
@@ -104,9 +111,8 @@ router.patch("/users/:id", auth, superAdmin, async (req, res) => {
 
     const oldStatus = user.status;
     user.status = status;
-    await user.save();
+    await user.save(); // Uses the instance save() we wrote
 
-    // ✅ LOG STATUS CHANGE
     await Log.create({
       adminEmail: req.admin.email || "Superadmin",
       action: "Status Update",
@@ -131,7 +137,6 @@ router.delete("/users/:id", auth, superAdmin, async (req, res) => {
     const deletedEmail = user.email;
     await Admin.findByIdAndDelete(req.params.id);
 
-    // ✅ LOG DELETION
     await Log.create({
       adminEmail: req.admin.email || "Superadmin",
       action: "Admin Deletion",
@@ -144,28 +149,22 @@ router.delete("/users/:id", auth, superAdmin, async (req, res) => {
   }
 });
 
-// ✅ NEW: GET LOGS (Super Admin only)
+// ✅ GET LOGS (Uses our new getLatestLogs helper)
 router.get("/logs", auth, superAdmin, async (req, res) => {
   try {
-    // Returns last 100 logs, newest first
-    const logs = await Log.find().sort({ createdAt: -1 }).limit(100);
+    const logs = await Log.getLatestLogs(100);
     res.json(logs);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch security logs" });
   }
 });
 
-
-
-// ================= FINANCIAL VAULT =================
-// ✅ NEW: GET FINANCIAL RECORDS (Superadmin only)
+// ✅ GET FINANCIAL RECORDS (Uses our new findSorted helper)
 router.get("/financials", auth, superAdmin, async (req, res) => {
   try {
-    // Only a superadmin can reach this point because of the 'superAdmin' middleware
-    const records = await FinancialRecord.find().sort({ date: -1 });
+    const records = await FinancialRecord.findSorted({}, { date: -1 });
     res.json(records);
   } catch (err) {
-    console.error("Financial Fetch Error:", err);
     res.status(500).json({ message: "Failed to fetch financial records" });
   }
 });

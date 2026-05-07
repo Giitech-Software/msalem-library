@@ -1,12 +1,22 @@
+const { ipcRenderer } = require('electron');
+
+// 1. EXPOSE API IMMEDIATELY
+// This ensures your React components can call window.electronAPI 
+// as soon as they mount without waiting for DOMContentLoaded.
+window.electronAPI = {
+  focusFix: () => ipcRenderer.send('focus-fix'),
+};
+
 window.addEventListener('DOMContentLoaded', () => {
-  // 1. THE "CLICK-TO-WAKE" FIX
+  // 2. THE "CLICK-TO-WAKE" FIX
   document.addEventListener('mousedown', () => {
     if (!document.hasFocus()) {
-      window.focus();
+      // Trigger the IPC fix we added in main.js
+      ipcRenderer.send('focus-fix');
     }
   }, true);
 
-  // 2. THE "AUTO-FOCUS" & INTERACTION RECOVERY
+  // 3. THE "AUTO-FOCUS" & INTERACTION RECOVERY
   const observer = new MutationObserver(() => {
     const activeInput = document.activeElement;
     
@@ -32,9 +42,10 @@ window.addEventListener('DOMContentLoaded', () => {
   startObserving();
 });
 
-// 3. GLOBAL INPUT RECOVERY
+// 4. GLOBAL INPUT RECOVERY
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
+    // Small delay to let React state updates complete
     setTimeout(() => {
       const activeInput = document.activeElement;
       if (!activeInput || activeInput === document.body) {
@@ -44,8 +55,3 @@ window.addEventListener('keydown', (e) => {
     }, 100);
   }
 });
-
-const { ipcRenderer } = require('electron');
-window.electronAPI = {
-  focusFix: () => ipcRenderer.send('focus-fix'),
-};

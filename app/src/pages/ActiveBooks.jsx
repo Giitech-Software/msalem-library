@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 // ✅ Using centralized API instance
 import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
+import { formatCedi } from "../utils/currency";
 
 const ActiveBorrowedBooks = () => {
   const [books, setBooks] = useState([]);
@@ -245,7 +246,7 @@ const ActiveBorrowedBooks = () => {
                       <div className="text-[10px] font-black">
                         <span className="text-gray-500 uppercase">Paid: </span>
                         <span className={book.borrowingCost > 0 ? "text-green-700" : "text-blue-600"}>
-                          ${book.borrowingCost || 0}
+                          {formatCedi(book.borrowingCost || 0)}
                         </span>
                       </div>
                       <div className="flex gap-1">

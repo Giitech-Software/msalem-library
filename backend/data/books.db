@@ -1,0 +1,6 @@
+{"$$indexCreated":{"fieldName":"borrowerId","unique":false,"sparse":false}}
+{"$$indexCreated":{"fieldName":"returned","unique":false,"sparse":false}}
+{"$$indexCreated":{"fieldName":"bookType","unique":false,"sparse":false}}
+{"$$indexCreated":{"fieldName":"borrowerId"}}
+{"$$indexCreated":{"fieldName":"returned"}}
+{"$$indexCreated":{"fieldName":"bookType"}}

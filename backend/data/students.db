@@ -1,0 +1,4 @@
+{"$$indexCreated":{"fieldName":"name","unique":true,"sparse":false}}
+{"$$indexCreated":{"fieldName":"studentId","unique":false,"sparse":false}}
+{"$$indexCreated":{"fieldName":"name","unique":true}}
+{"$$indexCreated":{"fieldName":"studentId"}}

@@ -3,6 +3,7 @@ import React, { useState, useRef } from "react";
 import API from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton"; 
+import { CURRENCY_SYMBOL } from "../utils/currency";
 
 const AddBookCatalog = () => {
   const navigate = useNavigate();
@@ -42,7 +43,11 @@ const AddBookCatalog = () => {
         `/bookCatalog/search?title=${encodeURIComponent(form.title)}`
       );
       
-      if (existing.data && existing.data.length > 0) {
+      const hasExactTitle = (existing.data || []).some(
+        (book) => book.title?.trim().toLowerCase() === form.title.trim().toLowerCase()
+      );
+
+      if (hasExactTitle) {
         setStatus({ show: true, message: "This title already exists in the catalog!", type: "error" });
         return;
       }
@@ -63,7 +68,6 @@ const AddBookCatalog = () => {
         payload.append("bookType", "Digital");
         payload.set("totalQuantity", "999999"); 
         
-        config.headers = { "Content-Type": "multipart/form-data" };
       } else {
         payload = { ...financialData, bookType: "Physical" };
       }
@@ -182,7 +186,7 @@ const AddBookCatalog = () => {
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold text-blue-600 uppercase italic">Borrowing Cost ($)</label>
+              <label className="text-xs font-bold text-blue-600 uppercase italic">Borrowing Cost ({CURRENCY_SYMBOL})</label>
               <input 
                 type="number" 
                 name="basePrice" 

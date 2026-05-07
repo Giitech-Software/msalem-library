@@ -4,6 +4,7 @@ import API from "../api/axiosInstance";
 import dayjs from "dayjs";
 import { jwtDecode } from "jwt-decode";
 import BackButton from "../components/BackButton";
+import { formatCedi } from "../utils/currency";
 
 const Statistics = () => {
   const [activeBooks, setActiveBooks] = useState([]);
@@ -89,7 +90,7 @@ const Statistics = () => {
       {userRole === "superadmin" && (
         <div className="mb-10 bg-white border-2 border-green-700 p-4 rounded-2xl shadow-xl flex flex-col items-center justify-center">
           <h2 className="text-green-700 text-xs font-black uppercase tracking-widest mb-1">Total Vault Revenue</h2>
-          <p className="text-4xl font-black text-gray-800">GHS {totalRevenue.toFixed(2)}</p>
+          <p className="text-4xl font-black text-gray-800">{formatCedi(totalRevenue, { decimals: 2 })}</p>
           <div className="mt-2 h-1 w-24 bg-yellow-400 rounded-full"></div>
         </div>
       )}
