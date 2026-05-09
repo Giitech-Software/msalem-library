@@ -13,8 +13,8 @@ const Admin = require('./models/Admin');
 
 async function setupSuperAdmin() {
   try {
-    const adminEmail = 'mm';
-    const plainPassword = 's5';
+    const adminEmail = 'msalemschoollibrary@gmail.com';
+    const plainPassword = 'salem2005';
 
     if (!fs.existsSync(process.env.DATA_DIR)) {
       fs.mkdirSync(process.env.DATA_DIR, { recursive: true });

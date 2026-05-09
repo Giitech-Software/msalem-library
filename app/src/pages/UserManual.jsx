@@ -1,68 +1,98 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import html2pdf from "html2pdf.js";
-import BackButton from "../components/BackButton"; // Import added
+import BackButton from "../components/BackButton";
 
 const UserManual = () => {
-
   const manualRef = useRef(null);
+  
+  // ✅ ADDED: Local non-blocking status notification state
+  const [status, setStatus] = useState({ show: false, message: "", type: "" });
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  const handleDownloadPDF = async () => {
+const handleDownloadPDF = async () => {
+  const element = manualRef.current;
+  if (!element) {
+    setStatus({ show: true, message: "Manual content not found.", type: "error" });
+    return;
+  }
 
-    try {
+  try {
+    setIsGenerating(true);
+    setStatus({ show: true, message: "Generating PDF... Please wait.", type: "success" });
 
-      const element = manualRef.current;
+    const options = {
+      margin: [0.5, 0.5, 0.5, 0.5],
+      filename: "MSalem-Library-User-Manual.pdf",
+      image: { type: "jpeg", quality: 0.95 },
+      html2canvas: {
+        scale: 1.5,
+        useCORS: true,
+        logging: false,
+        scrollY: 0,
+        // ✅ THE FIX: patch oklch colors in the cloned DOM before rendering
+        onclone: (_doc, element) => {
+          const allElements = element.querySelectorAll("*");
+          allElements.forEach((el) => {
+            const style = el.style;
+            // Patch inline styles
+            [...style].forEach((prop) => {
+              const val = style.getPropertyValue(prop);
+              if (val.includes("oklch")) {
+                style.setProperty(prop, "transparent");
+              }
+            });
 
-      if (!element) {
-        alert("Manual content not found.");
-        return;
-      }
+            // Patch computed stylesheet rules injected by Tailwind
+            const computed = window.getComputedStyle(el);
+            const bg = computed.backgroundColor;
+            const color = computed.color;
+            const border = computed.borderColor;
 
-      const options = {
-        margin: 0.5,
-        filename: "MSalem-Library-User-Manual.pdf",
-
-        image: {
-          type: "jpeg",
-          quality: 1,
+            if (bg?.includes("oklch")) el.style.backgroundColor = "#ffffff";
+            if (color?.includes("oklch")) el.style.color = "#1f2937";
+            if (border?.includes("oklch")) el.style.borderColor = "#e5e7eb";
+          });
         },
+      },
+      jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
+      pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+    };
 
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          scrollY: 0,
-        },
+    await html2pdf().set(options).from(element).save();
 
-        jsPDF: {
-          unit: "in",
-          format: "a4",
-          orientation: "portrait",
-        },
+    setStatus({ show: true, message: "PDF Downloaded successfully!", type: "success" });
+    setTimeout(() => setStatus({ show: false, message: "", type: "" }), 4000);
 
-        pagebreak: {
-          mode: ["avoid-all", "css", "legacy"],
-        },
-      };
-
-      await html2pdf()
-        .set(options)
-        .from(element)
-        .save();
-
-    } catch (error) {
-
-      console.error("PDF GENERATION ERROR:", error);
-
-      alert("Failed to generate PDF. Open DevTools console for details.");
-    }
-  };
+  } catch (error) {
+    console.error("PDF GENERATION ERROR:", error);
+    setStatus({
+      show: true,
+      message: "Failed to generate PDF. Check console logs.",
+      type: "error",
+    });
+  } finally {
+    setIsGenerating(false);
+  }
+};
 
   return (
-    <div className="p-4 md:p-8 min-h-screen" style={{ backgroundColor: "#fefce8" }}>
+    <div className="p-4 md:p-8 min-h-screen relative" style={{ backgroundColor: "#fefce8" }}>
       
-      {/* Back Button added outside the paper container */}
-      <div className="max-w-5xl mx-auto mb-6">
-         <BackButton label="⬅ Return to Dashboard" className="shadow-md" />
+      {/* ✅ ADDED: Floating Non-Blocking Notification UI */}
+      {status.show && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-2xl animate-bounce ${
+          status.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className="font-bold text-sm uppercase">{status.message}</span>
+            <button onClick={() => setStatus({ show: false })} className="ml-2 hover:opacity-70">✕</button>
+          </div>
+        </div>
+      )}
+
+      {/* Back Button */}
+      <div className="max-w-5xl mx-auto mb-6 flex justify-between items-center">
+        <BackButton label="⬅ Return to Dashboard" className="shadow-md" />
       </div>
 
       <div
@@ -76,7 +106,6 @@ const UserManual = () => {
           className="p-6 md:p-8 flex justify-between items-center border-b-4" 
           style={{ backgroundColor: "#15803d", color: "#ffffff", borderColor: "#facc15" }}
         >
-
           <div>
             <h1 className="text-2xl md:text-3xl font-black italic">
               M'Salem Library System
@@ -87,12 +116,17 @@ const UserManual = () => {
             </p>
           </div>
 
+          {/* ✅ UPDATED: Added 'data-html2canvas-ignore' so the PDF package doesn't render this button recursively */}
           <button
+            data-html2canvas-ignore="true"
             onClick={handleDownloadPDF}
-            className="px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black hover:bg-yellow-300 transition-all shadow-lg active:scale-95"
+            disabled={isGenerating}
+            className={`px-4 md:px-6 py-2 md:py-3 rounded-2xl font-black hover:bg-yellow-300 transition-all shadow-lg active:scale-95 ${
+              isGenerating ? "opacity-50 cursor-not-allowed" : ""
+            }`}
             style={{ backgroundColor: "#facc15", color: "#14532d" }}
           >
-            📄 Download PDF
+            {isGenerating ? "⏳ Rendering..." : "📄 Download PDF"}
           </button>
         </div>
 
@@ -275,7 +309,8 @@ const UserManual = () => {
               borrowings, overdue records, and system activities.
             </p>
           </section>
-{/* Section 4.5 - Statistics & Analytics */}
+
+          {/* Section 4.5 - Statistics & Analytics */}
           <section className="mb-10">
             <h2 className="text-2xl font-black border-b-2 mb-4 uppercase" style={{ color: "#166534", borderColor: "#dcfce7" }}>
               4.5 Statistics & Real-Time Analytics
@@ -318,6 +353,7 @@ const UserManual = () => {
               <strong>Note:</strong> Statistical accuracy depends entirely on consistent record-keeping. Ensure all books are officially "Returned" in the system to maintain the integrity of circulation analytics.
             </p>
           </section>
+
           {/* Section 5 */}
           <section className="mb-10">
             <h2 className="text-2xl font-black border-b-2 mb-4 uppercase" style={{ color: "#166534", borderColor: "#dcfce7" }}>
@@ -510,10 +546,8 @@ const UserManual = () => {
             </h2>
 
             <div className="space-y-5 text-sm">
-
               <div>
                 <p className="font-bold mb-2">Admin Management</p>
-
                 <p>
                   Superadministrators can create, suspend, reactivate, and
                   monitor administrator accounts. This ensures that only
@@ -524,7 +558,6 @@ const UserManual = () => {
 
               <div>
                 <p className="font-bold mb-2">Security Logs</p>
-
                 <p>
                   The system records critical activities including logins,
                   exports, deletions, borrowing actions, and administrative
@@ -535,7 +568,6 @@ const UserManual = () => {
 
               <div>
                 <p className="font-bold mb-2">Financial Vault</p>
-
                 <p>
                   The Financial Vault provides oversight into revenue generated
                   through physical borrowing charges, digital dispatch fees, or
@@ -614,7 +646,6 @@ const UserManual = () => {
             </h2>
 
             <ul className="list-disc ml-5 text-sm space-y-4">
-
               <li>
                 <strong>Email fails:</strong> Verify that EMAIL_USER and
                 EMAIL_PASS values are correctly configured inside the .env file.
