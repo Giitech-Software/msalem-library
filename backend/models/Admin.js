@@ -3,9 +3,19 @@ const Datastore = require('nedb-promises');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-// Create the database file in the production-safe data directory
-const dbPath = path.join(process.env.DATA_DIR || __dirname, 'admins.db');
+// Resolve DATA_DIR the same way server.js and Electron do:
+// - Electron sets DATA_DIR to AppData/database at runtime
+// - Dev fallback is backend/data/ (never backend/models/)
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.resolve(__dirname, '..', 'data');
+
+const dbPath = path.join(DATA_DIR, 'admins.db');
+console.log(`[Admin.js] Using database at: ${dbPath}`);
+
 const db = Datastore.create({ filename: dbPath, autoload: true });
+
+// ... rest of the file stays exactly the same
 
 class Admin {
   constructor(data) {

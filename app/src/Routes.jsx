@@ -1,34 +1,35 @@
 //app/src/Routes.jsx
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute"; 
 
 // Existing Pages
-import HomePage from "./pages/HomePage";
-import Dashboard from "./pages/Dashboard";
-import Login from "./pages/Login";
-import AddBookCatalog from "./pages/AddBookCatalog";
-import BookCatalog from "./pages/BookCatalog";
-import ActiveBooks from "./pages/ActiveBooks";
-import BookBorrowForm from "./pages/BookBorrowForm";
-import ArchivedBooks from "./pages/ArchivedBooks";
-import Statistics from "./pages/Statistics";
-import OverdueBooks from "./pages/OverdueBooks";
-import StudentList from "./pages/StudentList";
-import StaffList from "./pages/StaffList";
-import AdminManagement from "./pages/AdminManagement"; 
-import SecurityLogs from "./pages/SecurityLogs"; 
-import GeneralUserList from "./pages/GeneralUserList"; 
+const HomePage = lazy(() => import("./pages/HomePage"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Login = lazy(() => import("./pages/Login"));
+const AddBookCatalog = lazy(() => import("./pages/AddBookCatalog"));
+const BookCatalog = lazy(() => import("./pages/BookCatalog"));
+const ActiveBooks = lazy(() => import("./pages/ActiveBooks"));
+const BookBorrowForm = lazy(() => import("./pages/BookBorrowForm"));
+const ArchivedBooks = lazy(() => import("./pages/ArchivedBooks"));
+const Statistics = lazy(() => import("./pages/Statistics"));
+const OverdueBooks = lazy(() => import("./pages/OverdueBooks"));
+const StudentList = lazy(() => import("./pages/StudentList"));
+const StaffList = lazy(() => import("./pages/StaffList"));
+const AdminManagement = lazy(() => import("./pages/AdminManagement"));
+const SecurityLogs = lazy(() => import("./pages/SecurityLogs"));
+const GeneralUserList = lazy(() => import("./pages/GeneralUserList"));
 
 // ✅ NEW: Import the Financial Vault Page
-import SuperAdminFinance from "./pages/SuperAdminFinance"; 
+const SuperAdminFinance = lazy(() => import("./pages/SuperAdminFinance"));
 
 // ✅ NEW: Import the User Manual Page
-import UserManual from "./pages/UserManual";
+const UserManual = lazy(() => import("./pages/UserManual"));
 
 const AppRoutes = () => {
   return (
-    <Routes>
+    <Suspense fallback={<div className="min-h-screen bg-yellow-50 flex items-center justify-center text-green-800 font-black animate-pulse">Loading page...</div>}>
+      <Routes>
       {/* Public Pages */}
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<Login />} />
@@ -79,7 +80,8 @@ const AppRoutes = () => {
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 };
 

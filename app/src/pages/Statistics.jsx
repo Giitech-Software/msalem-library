@@ -22,7 +22,7 @@ const Statistics = () => {
         const decoded = jwtDecode(token);
         currentRole = decoded.role;
         setUserRole(currentRole);
-      } catch (err) {
+      } catch {
         console.error("Invalid token found");
       }
     }

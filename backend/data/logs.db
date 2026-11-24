@@ -1,2 +1,10 @@
+{"adminEmail":"msalemschoollibrary@gmail.com","action":"Student Archive Restore","details":"Restored 1 archived student","createdAt":{"$$date":1791237745554},"updatedAt":{"$$date":1791237745554},"_id":"3gMMnIz0ab8fkGMd"}
+{"adminEmail":"msalemschoollibrary@gmail.com","action":"Student Bulk Import","details":"Imported 1 students into JHS (JHS3)","createdAt":{"$$date":1791235653540},"updatedAt":{"$$date":1791235653540},"_id":"B8EJ8HTkYVmdPpGF"}
+{"adminEmail":"msalemschoollibrary@gmail.com","action":"Class Graduation","details":"Graduated and archived 1 students from JHS3","createdAt":{"$$date":1791237729123},"updatedAt":{"$$date":1791237729123},"_id":"VFp3nPVD1ilnEq1s"}
+{"adminEmail":"msalemschoollibrary@gmail.com","action":"Login","details":"Admin logged into the system","createdAt":{"$$date":1791237675908},"updatedAt":{"$$date":1791237675908},"_id":"XV71PGHgXnUZ9JAX"}
+{"adminEmail":"msalemschoollibrary@gmail.com","action":"Class Graduation","details":"Graduated and archived 1 students from JHS3","createdAt":{"$$date":1791235681018},"updatedAt":{"$$date":1791235681018},"_id":"azJlq5V8PaMHE8cq"}
+{"adminEmail":"msalemschoollibrary@gmail.com","action":"Login","details":"Admin logged into the system","createdAt":{"$$date":1791236779540},"updatedAt":{"$$date":1791236779540},"_id":"bZ5tNHYQu1lEVFue"}
+{"adminEmail":"msalemschoollibrary@gmail.com","action":"Student Archive Restore","details":"Restored 1 archived student","createdAt":{"$$date":1791237706311},"updatedAt":{"$$date":1791237706311},"_id":"mVyZi5CmhIGhWq0J"}
+{"adminEmail":"msalemschoollibrary@gmail.com","action":"Login","details":"Admin logged into the system","createdAt":{"$$date":1791235475578},"updatedAt":{"$$date":1791235475578},"_id":"rAIeTgPblL5OZKFe"}
 {"$$indexCreated":{"fieldName":"createdAt","unique":false,"sparse":false}}
-{"$$indexCreated":{"fieldName":"createdAt"}}
+{"adminEmail":"msalemschoollibrary@gmail.com","action":"Login","details":"Admin logged into the system","createdAt":{"$$date":1795562576406},"updatedAt":{"$$date":1795562576406},"_id":"rL00BkGJn8CX6hx3"}

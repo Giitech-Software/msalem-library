@@ -1,3 +1,4 @@
+// main.js - Electron Main Process
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');

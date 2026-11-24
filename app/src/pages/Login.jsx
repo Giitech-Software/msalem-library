@@ -3,7 +3,7 @@ import axios from "axios";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle, Clock } from "lucide-react";
 
-const API_BASE = "http://127.0.0.1:5000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000";
 
 function Login() {
   const [email, setEmail] = useState("");

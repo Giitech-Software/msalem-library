@@ -47,7 +47,7 @@ const StaffList = () => {
       setBulkNames("");
       setView("list");
       fetchStaff();
-    } catch (err) { 
+    } catch { 
       showStatus("Error adding staff. Make sure you are logged in.", "error");
     }
   };
@@ -69,7 +69,7 @@ const StaffList = () => {
       showStatus("Staff member removed.", "success");
       fetchStaff();
       closeDeleteModal();
-    } catch (err) {
+    } catch {
       showStatus("Failed to delete. Access denied.", "error");
       closeDeleteModal();
     }
@@ -87,7 +87,7 @@ const StaffList = () => {
       showStatus("Staff member updated!", "success");
       setEditingId(null);
       fetchStaff();
-    } catch (err) {
+    } catch {
       showStatus("Update failed.", "error");
     }
   };
@@ -202,7 +202,7 @@ const StaffList = () => {
             ))}
             
             {filteredStaff.length === 0 && (
-              <div className="col-span-full text-center py-20 bg-white rounded-3xl border-2 border-dashed border-gray-200">
+              <div className="col-span-full text-center py-5 bg-white rounded-3xl border-2 border-dashed border-gray-200">
                 <p className="text-gray-400 font-bold uppercase tracking-widest">
                   {searchTerm ? `No results for "${searchTerm}"` : "No staff records found"}
                 </p>

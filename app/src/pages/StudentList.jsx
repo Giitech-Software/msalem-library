@@ -5,14 +5,19 @@ import BackButton from "../components/BackButton";
 
 const StudentList = () => {
   const [students, setStudents] = useState([]);
+  const [archivedStudents, setArchivedStudents] = useState([]);
+  const [selectedArchivedIds, setSelectedArchivedIds] = useState([]);
   const [view, setView] = useState("list"); 
   const [status, setStatus] = useState({ show: false, message: "", type: "" });
   const [searchTerm, setSearchTerm] = useState(""); 
+  const [classFilter, setClassFilter] = useState("");
 
   const [form, setForm] = useState({ name: "", category: "", subCategory: "" });
   const [bulkData, setBulkData] = useState("");
   const [promo, setPromo] = useState({ from: "", to: "" });
   const [gradClass, setGradClass] = useState("");
+  const [actionInProgress, setActionInProgress] = useState(false);
+  const [archiveLoading, setArchiveLoading] = useState(false);
 
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
@@ -43,10 +48,39 @@ const StudentList = () => {
     } catch (err) { console.error(err); }
   };
 
-  const filteredStudents = students.filter(std => 
-    std.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    std.subCategory.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (std.studentId && std.studentId.toLowerCase().includes(searchTerm.toLowerCase()))
+  const fetchArchivedStudents = async () => {
+    setArchiveLoading(true);
+    try {
+      const res = await API.get("/students/archived");
+      setArchivedStudents(res.data);
+      setSelectedArchivedIds([]);
+    } catch (err) {
+      showStatus(err.response?.data?.message || "Failed to fetch archived students.", "error");
+    } finally {
+      setArchiveLoading(false);
+    }
+  };
+
+  const changeView = (nextView) => {
+    setView(nextView);
+    if (nextView === "archive") fetchArchivedStudents();
+  };
+
+  const filteredStudents = students.filter(std => {
+    const matchesClass = !classFilter || std.subCategory === classFilter;
+    const search = searchTerm.toLowerCase();
+    const matchesSearch =
+      std.name.toLowerCase().includes(search) ||
+      std.subCategory.toLowerCase().includes(search) ||
+      (std.studentId && std.studentId.toLowerCase().includes(search));
+
+    return matchesClass && matchesSearch;
+  });
+
+  const filteredArchivedStudents = archivedStudents.filter((student) =>
+    student.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.subCategory?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.studentId?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleBulkImport = async (e) => {
@@ -64,7 +98,7 @@ const StudentList = () => {
       setBulkData("");
       setView("list");
       fetchStudents();
-    } catch (err) { showStatus("Import failed. Check your login.", "error"); }
+    } catch { showStatus("Import failed. Check your login.", "error"); }
   };
 
   const closeModal = () => setModal({ ...modal, open: false });
@@ -86,7 +120,7 @@ const StudentList = () => {
       open: true,
       type: 'graduate',
       title: 'Confirm Graduation',
-      message: `Move all ${gradClass} students to Archive? This cannot be undone.`,
+      message: `Move all ${gradClass} students to Archive? You can restore them later from the Archive tab.`,
       color: 'bg-red-600'
     });
   };
@@ -102,7 +136,21 @@ const StudentList = () => {
     });
   };
 
+  const triggerRestore = (ids) => {
+    if (!ids.length) return;
+    setModal({
+      open: true,
+      type: "restore",
+      ids,
+      title: ids.length === 1 ? "Restore Student" : "Restore Students",
+      message: `Restore ${ids.length} archived student${ids.length === 1 ? "" : "s"} to the student registry?`,
+      color: "bg-green-700"
+    });
+  };
+
   const handleConfirmAction = async () => {
+    if (actionInProgress) return;
+    setActionInProgress(true);
     try {
       if (modal.type === 'promote') {
         // ✅ UPDATED: Using API instance
@@ -121,12 +169,26 @@ const StudentList = () => {
         // ✅ UPDATED: Using API instance
         await API.delete(`/students/${modal.id}`);
         showStatus("Student removed", "success");
+      } else if (modal.type === "restore") {
+        const res = await API.post("/students/archived/restore", { ids: modal.ids });
+        const restoredIds = res.data.restoredIds || [];
+        setArchivedStudents((current) => current.filter((student) => !restoredIds.includes(student._id)));
+        setSelectedArchivedIds((current) => current.filter((id) => !restoredIds.includes(id)));
+        fetchStudents();
+        showStatus(
+          res.data.skipped?.length
+            ? `${res.data.message} ${res.data.skipped.map((student) => student.reason).join(" ")}`
+            : res.data.message,
+          res.data.skipped?.length ? "error" : "success"
+        );
       }
-      fetchStudents();
+      if (modal.type !== "restore") fetchStudents();
       closeModal();
     } catch (err) {
-      showStatus("Action failed. Session may have expired.", "error");
+      showStatus(err.response?.data?.message || "Graduation failed. Please try again.", "error");
       closeModal();
+    } finally {
+      setActionInProgress(false);
     }
   };
 
@@ -142,7 +204,7 @@ const StudentList = () => {
       showStatus("Student updated", "success");
       setEditingId(null);
       fetchStudents();
-    } catch (err) { showStatus("Update failed.", "error"); }
+    } catch { showStatus("Update failed.", "error"); }
   };
 
   const showStatus = (msg, type) => {
@@ -164,22 +226,36 @@ const StudentList = () => {
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <h1 className="text-3xl font-black text-green-800 uppercase tracking-tight">👥 Student Registry</h1>
           <div className="flex flex-wrap gap-2 bg-white p-1 rounded-2xl shadow-md border border-yellow-200">
-            <button onClick={() => setView("list")} className={`px-4 py-2 rounded-xl font-bold transition ${view === 'list' ? 'bg-green-700 text-white' : 'text-green-700 hover:bg-green-50'}`}>View All</button>
-            <button onClick={() => setView("bulk")} className={`px-4 py-2 rounded-xl font-bold transition ${view === 'bulk' ? 'bg-yellow-500 text-white' : 'text-yellow-600 hover:bg-yellow-50'}`}>Bulk Import</button>
-            <button onClick={() => setView("promote")} className={`px-4 py-2 rounded-xl font-bold transition ${view === 'promote' ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50'}`}>Promote</button>
-            <button onClick={() => setView("graduate")} className={`px-4 py-2 rounded-xl font-bold transition ${view === 'graduate' ? 'bg-red-600 text-white' : 'text-red-600 hover:bg-red-50'}`}>Graduate</button>
+            <button onClick={() => changeView("list")} className={`px-4 py-2 rounded-xl font-bold transition ${view === 'list' ? 'bg-green-700 text-white' : 'text-green-700 hover:bg-green-50'}`}>View All</button>
+            <button onClick={() => changeView("bulk")} className={`px-4 py-2 rounded-xl font-bold transition ${view === 'bulk' ? 'bg-yellow-500 text-white' : 'text-yellow-600 hover:bg-yellow-50'}`}>Bulk Import</button>
+            <button onClick={() => changeView("promote")} className={`px-4 py-2 rounded-xl font-bold transition ${view === 'promote' ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50'}`}>Promote</button>
+            <button onClick={() => changeView("graduate")} className={`px-4 py-2 rounded-xl font-bold transition ${view === 'graduate' ? 'bg-red-600 text-white' : 'text-red-600 hover:bg-red-50'}`}>Graduate</button>
+            <button onClick={() => changeView("archive")} className={`px-4 py-2 rounded-xl font-bold transition ${view === 'archive' ? 'bg-gray-800 text-white' : 'text-gray-700 hover:bg-gray-100'}`}>Archive</button>
           </div>
         </div>
 
-        {view === "list" && (
-          <div className="mb-6">
+        {(view === "list" || view === "archive") && (
+          <div className="mb-6 flex flex-col md:flex-row gap-3">
             <input 
               type="text"
               placeholder="🔍 Search by name, ID, or class..."
-              className="w-full p-2 rounded-2xl border-2 border-yellow-200 shadow-sm outline-none focus:border-green-600 transition"
+              className="flex-1 p-2 rounded-2xl border-2 border-yellow-200 shadow-sm outline-none focus:border-green-600 transition"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            {view === "list" && (
+              <select
+                value={classFilter}
+                onChange={(e) => setClassFilter(e.target.value)}
+                aria-label="Filter students by class"
+                className="md:w-56 p-2 rounded-2xl border-2 border-green-200 bg-white shadow-sm outline-none focus:border-green-600 transition font-bold text-green-800"
+              >
+                <option value="">All classes</option>
+                {allSubCategories.map((className) => (
+                  <option key={className} value={className}>{className}</option>
+                ))}
+              </select>
+            )}
           </div>
         )}
 
@@ -229,7 +305,7 @@ const StudentList = () => {
         {view === "graduate" && (
           <div className="bg-white p-8 rounded-3xl shadow-xl border-t-8 border-red-600">
             <h2 className="text-xl font-bold mb-2 text-red-800">Archive Graduating Class</h2>
-            <p className="text-sm text-gray-500 mb-6 font-medium uppercase tracking-wider">⚠️ Action moves students to archive</p>
+            <p className="text-sm text-gray-500 mb-6 font-medium uppercase tracking-wider">Students can be restored individually or as a group from the Archive tab.</p>
             <div className="flex flex-col md:flex-row gap-4 items-end">
               <div className="flex-1">
                 <select value={gradClass} onChange={(e) => setGradClass(e.target.value)} className="w-full border-2 p-2 rounded-xl outline-none font-bold">
@@ -264,6 +340,7 @@ const StudentList = () => {
                               {std.studentId}
                             </span>
                           )}
+
                         </div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{std.category} • {std.subCategory}</p>
                         {std.contact && (
@@ -295,6 +372,78 @@ const StudentList = () => {
             )}
           </div>
         )}
+
+        {view === "archive" && (
+          <section className="bg-white rounded-3xl shadow-xl border-t-8 border-gray-700 p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-xl font-black text-gray-800">Graduated Student Archive</h2>
+                <p className="text-sm text-gray-500">{filteredArchivedStudents.length} archived student{filteredArchivedStudents.length === 1 ? "" : "s"}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm font-bold text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={filteredArchivedStudents.length > 0 && filteredArchivedStudents.every((student) => selectedArchivedIds.includes(student._id))}
+                    onChange={(event) => {
+                      const visibleIds = filteredArchivedStudents.map((student) => student._id);
+                      setSelectedArchivedIds((current) => event.target.checked
+                        ? [...new Set([...current, ...visibleIds])]
+                        : current.filter((id) => !visibleIds.includes(id)));
+                    }}
+                  />
+                  Select filtered
+                </label>
+                <button
+                  onClick={() => triggerRestore(selectedArchivedIds)}
+                  disabled={selectedArchivedIds.length === 0 || archiveLoading}
+                  className="bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
+                >
+                  Restore selected ({selectedArchivedIds.length})
+                </button>
+              </div>
+            </div>
+
+            {archiveLoading ? (
+              <p className="py-10 text-center text-gray-500 font-bold">Loading archived students...</p>
+            ) : filteredArchivedStudents.length === 0 ? (
+              <p className="py-10 text-center text-gray-400 font-bold">
+                {archivedStudents.length ? "No archived students match your search." : "No graduated students in the archive."}
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredArchivedStudents.map((student) => (
+                  <article key={student._id} className="border border-gray-200 rounded-2xl p-4 flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      aria-label={`Select ${student.name}`}
+                      checked={selectedArchivedIds.includes(student._id)}
+                      onChange={(event) => setSelectedArchivedIds((current) => event.target.checked
+                        ? [...current, student._id]
+                        : current.filter((id) => id !== student._id))}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-800">{student.name}</h3>
+                      <p className="text-xs font-bold text-gray-500 uppercase">{student.category} • {student.subCategory}</p>
+                      {student.studentId && <p className="text-xs text-green-700 mt-1">{student.studentId}</p>}
+                      <p className="text-xs text-gray-400 mt-1">
+                        Graduated: {new Date(student.graduationDate).toLocaleDateString()}
+                      </p>
+                      <button
+                        onClick={() => triggerRestore([student._id])}
+                        disabled={archiveLoading}
+                        className="mt-3 bg-green-50 text-green-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-100 disabled:opacity-50"
+                      >
+                        Restore student
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
 
       {modal.open && (
@@ -304,7 +453,9 @@ const StudentList = () => {
             <p className="text-gray-500 text-sm mb-6">{modal.message}</p>
             <div className="flex gap-3">
               <button onClick={closeModal} className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl font-bold">Cancel</button>
-              <button onClick={handleConfirmAction} className={`flex-1 py-2 text-white rounded-xl font-bold transition ${modal.color}`}>Confirm</button>
+              <button onClick={handleConfirmAction} disabled={actionInProgress} className={`flex-1 py-2 text-white rounded-xl font-bold transition ${modal.color} disabled:opacity-50 disabled:cursor-not-allowed`}>
+                {actionInProgress ? "Working..." : "Confirm"}
+              </button>
             </div>
           </div>
         </div>

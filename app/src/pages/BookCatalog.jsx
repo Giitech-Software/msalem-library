@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 // ✅ CHANGED: Using centralized API instance
 import API from "../api/axiosInstance";
 import BackButton from "../components/BackButton";
@@ -35,12 +35,19 @@ const BookCatalog = () => {
     }
   };
 
-  const filteredCatalog = (catalog || []).filter((book) => {
+  const borrowedCountByTitle = useMemo(() => {
+    return (borrowedRecords || []).reduce((counts, record) => {
+      if (record.returned !== true) counts[record.title] = (counts[record.title] || 0) + 1;
+      return counts;
+    }, {});
+  }, [borrowedRecords]);
+
+  const filteredCatalog = useMemo(() => (catalog || []).filter((book) => {
     const title = book?.title?.toLowerCase() || "";
     const author = book?.author?.toLowerCase() || "";
     const search = searchTerm.toLowerCase();
     return title.includes(search) || author.includes(search);
-  });
+  }), [catalog, searchTerm]);
 
   const openDeleteModal = (id) => {
     setSelectedBookId(id);
@@ -94,7 +101,7 @@ const BookCatalog = () => {
       await API.put(`/bookCatalog/${editing}`, updatedData);
       setEditing(null);
       fetchData();
-    } catch (err) {
+    } catch {
       alert("Update failed.");
     }
   };
@@ -135,9 +142,7 @@ const BookCatalog = () => {
           <tbody className="divide-y divide-gray-200">
             {filteredCatalog.length > 0 ? (
               filteredCatalog.map((book) => {
-                const borrowedCount = (borrowedRecords || []).filter(
-                  (r) => r.title === book.title && r.returned !== true
-                ).length;
+                const borrowedCount = borrowedCountByTitle[book.title] || 0;
                 
                 const total = book.totalQuantity || 0;
                 const available = total - borrowedCount;

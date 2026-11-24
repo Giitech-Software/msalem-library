@@ -5,12 +5,16 @@ const { withoutEmptyId } = require('./utils');
 // Storage: archived_students.db
 const dbPath = path.join(process.env.DATA_DIR || __dirname, 'archived_students.db');
 const db = Datastore.create({ filename: dbPath, autoload: true });
+db.ensureIndex({ fieldName: 'graduationDate' });
+db.ensureIndex({ fieldName: 'subCategory' });
 
 class ArchivedStudent {
   constructor(data) {
     this.name = data.name;
+    this.studentId = data.studentId || "";
     this.category = data.category;
     this.subCategory = data.subCategory;
+    this.contact = data.contact || "";
     // Mimics Mongoose default: Date.now
     this.graduationDate = data.graduationDate || new Date();
     this._id = data._id || null;
@@ -26,6 +30,10 @@ class ArchivedStudent {
   static async findOne(query) {
     const data = await db.findOne(query);
     return data ? new ArchivedStudent(data) : null;
+  }
+
+  static async findByIdAndDelete(id) {
+    return db.remove({ _id: id });
   }
 
   // Mimics Mongoose: await ArchivedStudent.create(data)

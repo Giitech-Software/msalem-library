@@ -64,7 +64,7 @@ const AdminManagement = () => {
       setStatus({ show: true, message: `Admin is now ${newStatus}`, type: "success" });
       fetchAdmins();
       fetchLogs();
-    } catch (err) {
+    } catch {
       setStatus({ show: true, message: "Update failed", type: "error" });
     }
   };
@@ -76,7 +76,7 @@ const AdminManagement = () => {
       setStatus({ show: true, message: "Admin Deleted", type: "success" });
       fetchAdmins();
       fetchLogs();
-    } catch (err) {
+    } catch {
       setStatus({ show: true, message: "Delete failed", type: "error" });
     }
   };

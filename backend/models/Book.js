@@ -11,6 +11,8 @@ const db = Datastore.create({ filename: dbPath, autoload: true });
 db.ensureIndex({ fieldName: 'borrowerId' });
 db.ensureIndex({ fieldName: 'returned' });
 db.ensureIndex({ fieldName: 'bookType' });
+db.ensureIndex({ fieldName: 'returnDate' });
+db.ensureIndex({ fieldName: 'borrowerName' });
 
 class Book {
   constructor(data) {

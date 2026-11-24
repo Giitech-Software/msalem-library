@@ -8,6 +8,7 @@ const db = Datastore.create({ filename: dbPath, autoload: true });
 
 db.ensureIndex({ fieldName: 'name' });
 db.ensureIndex({ fieldName: 'studentId' });
+db.ensureIndex({ fieldName: 'subCategory' });
 
 class Student {
   constructor(data) {

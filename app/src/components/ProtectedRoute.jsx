@@ -32,7 +32,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     }
 
     return children;
-  } catch (error) {
+  } catch {
     // If token is malformed
     localStorage.removeItem("token");
     return <Navigate to="/" replace />;

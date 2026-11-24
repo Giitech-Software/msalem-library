@@ -327,6 +327,41 @@ router.put("/return/:id", auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+router.put("/restore/:id", auth, async (req, res) => {
+  try {
+    const book = await Book.findById(req.params.id);
+    if (!book) return res.status(404).json({ message: "Book not found" });
+    if (book.bookType === "Digital") {
+      return res.status(400).json({ message: "Digital access records cannot be restored as active loans." });
+    }
+    if (!book.returned) {
+      return res.status(409).json({ message: "Book is not archived." });
+    }
+    const activeLoan = await Book.findOne({
+      borrowerName: book.borrowerName,
+      returned: false,
+      bookType: "Physical"
+    });
+    if (activeLoan) {
+      return res.status(409).json({ message: "Borrower already has an active physical book." });
+    }
+
+    book.returned = false;
+    book.status = "Borrowed";
+    await book.save();
+
+    await Log.create({
+      adminEmail: req.admin.email,
+      action: "Book Restored",
+      details: `Restored "${book.title}" for ${book.borrowerName} to active borrowed books`
+    });
+
+    res.status(200).json({ message: "Book restored to active borrowed books", book });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to restore book" });
+  }
+});
+
 router.post("/delete/:id", auth, async (req, res) => { 
   const { email, password } = req.body;
   try {

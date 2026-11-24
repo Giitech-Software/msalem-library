@@ -1,4 +1,4 @@
-{"$$indexCreated":{"fieldName":"name","unique":true,"sparse":false}}
+{"name":"kwame owusu","studentId":"","category":"JHS","subCategory":"JHS3","contact":"","_id":"TCBpOaxEXW3kS0R8"}
+{"$$indexCreated":{"fieldName":"name","unique":false,"sparse":false}}
 {"$$indexCreated":{"fieldName":"studentId","unique":false,"sparse":false}}
-{"$$indexCreated":{"fieldName":"name","unique":true}}
-{"$$indexCreated":{"fieldName":"studentId"}}
+{"$$indexCreated":{"fieldName":"subCategory","unique":false,"sparse":false}}

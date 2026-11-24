@@ -1,96 +1,64 @@
-
-const fs = require('fs');
+// backend/bootstrapAdmin.js
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 
 let Admin;
-
 function getAdminModel() {
-  if (!Admin) {
-    Admin = require('./models/Admin');
-  }
-
+  if (!Admin) Admin = require('./models/Admin');
   return Admin;
 }
 
-function parseSeedAdmins(seedPath) {
-  if (!fs.existsSync(seedPath)) return [];
-
-  return fs.readFileSync(seedPath, 'utf8')
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      try {
-        const admin = JSON.parse(line);
-        delete admin._id;
-        return admin;
-      } catch (err) {
-        console.error(`[Admin Bootstrap] Skipping invalid seed row: ${err.message}`);
-        return null;
-      }
-    })
-    .filter(Boolean);
-}
-
-function getEnvAdmin() {
-  const email = process.env.ADMIN_EMAIL || process.env.DEFAULT_ADMIN_EMAIL;
-  const password = process.env.ADMIN_PASSWORD || process.env.DEFAULT_ADMIN_PASSWORD;
-
-  if (!email || !password) return null;
-
-  return {
-    email,
-    password,
-    role: process.env.ADMIN_ROLE || 'superadmin',
-    status: 'active',
-  };
-}
-
 async function bootstrapAdmin() {
-  repairDatabaseFiles();
+  // DATA_DIR is already set by server.js before this runs
+  const dataDir = process.env.DATA_DIR
+    ? path.resolve(process.env.DATA_DIR)
+    : path.resolve(__dirname, 'data'); // backend/data/ — never backend/models/
+
+  // Ensure the data directory exists
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+
+  repairDatabaseFiles(dataDir);
 
   const Admin = getAdminModel();
   const existingAdmins = await Admin.find();
-  if (existingAdmins.length > 0) return;
 
-  const adminsToCreate = [];
-  const envAdmin = getEnvAdmin();
-  if (envAdmin) adminsToCreate.push(envAdmin);
-
-  const seedPath = path.join(__dirname, 'models', 'admins.db');
-  adminsToCreate.push(...parseSeedAdmins(seedPath));
-
-  const seenEmails = new Set();
-  for (const admin of adminsToCreate) {
-    const email = admin.email?.trim().toLowerCase();
-    if (!email || !admin.password || seenEmails.has(email)) continue;
-
-    seenEmails.add(email);
-    await Admin.create({ ...admin, email });
-    console.log(`[Admin Bootstrap] Created ${admin.role || 'admin'} account: ${email}`);
+  if (existingAdmins.length > 0) {
+    console.log('[Bootstrap] Admin account(s) already exist — skipping seed.');
+    return;
   }
 
-  if (seenEmails.size === 0) {
-    console.warn('[Admin Bootstrap] No admin accounts found and no seed credentials configured.');
+  // Pull credentials from .env only — no seed file, no hardcoded values
+  const email    = process.env.SUPER_ADMIN_EMAIL
+                || process.env.ADMIN_EMAIL
+                || process.env.DEFAULT_ADMIN_EMAIL;
+  const password = process.env.SUPER_ADMIN_PASSWORD
+                || process.env.ADMIN_PASSWORD
+                || process.env.DEFAULT_ADMIN_PASSWORD;
+  const name     = process.env.SUPER_ADMIN_NAME || 'Super Admin';
+
+  if (!email || !password) {
+    console.warn('[Bootstrap] ⚠️  No SUPER_ADMIN_EMAIL/PASSWORD in .env — no admin seeded.');
+    console.warn('[Bootstrap]    Run "node manageAdmin.js" after setting credentials in .env');
+    return;
   }
+
+  await Admin.create({ name, email, password, role: 'superadmin', status: 'active' });
+  console.log('─────────────────────────────────────────────');
+  console.log('[Bootstrap] ✅ Super admin created.');
+  console.log(`[Bootstrap]    Email : ${email}`);
+  console.log(`[Bootstrap]    Dir   : ${dataDir}`);
+  console.log('─────────────────────────────────────────────');
 }
 
-function repairDatabaseFiles() {
-  const dataDir = process.env.DATA_DIR || path.join(__dirname, 'models');
+function repairDatabaseFiles(dataDir) {
   const databaseFiles = [
-    'admins.db',
-    'archived_students.db',
-    'books.db',
-    'book_catalog.db',
-    'categories.db',
-    'financial_records.db',
-    'general_users.db',
-    'logs.db',
-    'staff.db',
-    'students.db',
+    'admins.db', 'archived_students.db', 'books.db', 'book_catalog.db',
+    'categories.db', 'financial_records.db', 'general_users.db',
+    'logs.db', 'staff.db', 'students.db',
   ];
-
   for (const fileName of databaseFiles) {
     repairDatabaseFile(path.join(dataDir, fileName));
   }
@@ -105,38 +73,31 @@ function repairDatabaseFile(dbPath) {
   const repairedLines = lines.map((line) => {
     const trimmed = line.trim();
     if (!trimmed) return line;
-
     try {
       const doc = JSON.parse(trimmed);
 
       if (
-        doc.$$indexCreated &&
-        doc.$$indexCreated.fieldName === 'name' &&
-        doc.$$indexCreated.unique === true &&
+        doc.$$indexCreated?.fieldName === 'name' &&
+        doc.$$indexCreated?.unique === true &&
         ['students.db', 'staff.db', 'general_users.db'].includes(path.basename(dbPath))
       ) {
         doc.$$indexCreated.unique = false;
         changed = true;
-        console.log(`[Database Repair] Relaxed unique name index in ${path.basename(dbPath)}`);
+        console.log(`[Repair] Relaxed unique name index in ${path.basename(dbPath)}`);
         return JSON.stringify(doc);
       }
 
       if (Object.prototype.hasOwnProperty.call(doc, '_id') && !doc._id) {
         doc._id = crypto.randomBytes(8).toString('hex');
         changed = true;
-        console.log(`[Database Repair] Repaired null id in ${path.basename(dbPath)}: ${doc.email || doc.name || doc.title || 'record'}`);
+        console.log(`[Repair] Fixed null _id in ${path.basename(dbPath)}`);
         return JSON.stringify(doc);
       }
-    } catch (err) {
-      return line;
-    }
-
+    } catch { return line; }
     return line;
   });
 
-  if (changed) {
-    fs.writeFileSync(dbPath, repairedLines.join('\n'), 'utf8');
-  }
+  if (changed) fs.writeFileSync(dbPath, repairedLines.join('\n'), 'utf8');
 }
 
 module.exports = bootstrapAdmin;

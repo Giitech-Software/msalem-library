@@ -71,7 +71,7 @@ const Dashboard = () => {
         const decoded = jwtDecode(token);
         setUserRole(decoded.role);
         fetchOverdueCount();
-      } catch (error) {
+      } catch {
         console.error("Invalid token");
         handleLogout();
       }

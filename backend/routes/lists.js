@@ -130,9 +130,82 @@ router.delete("/students/:id", auth, async (req, res) => {
   }
 });
 
+// ARCHIVED STUDENTS
+router.get("/students/archived", async (req, res) => {
+  try {
+    const students = await ArchivedStudent.findSorted();
+    res.json(students);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch archived students" });
+  }
+});
+
+router.post("/students/archived/restore", auth, async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.some((id) => typeof id !== "string")) {
+    return res.status(400).json({ message: "Select one or more archived students to restore." });
+  }
+
+  try {
+    const restoredIds = [];
+    const skipped = [];
+
+    for (const id of [...new Set(ids)]) {
+      const archivedStudent = await ArchivedStudent.findOne({ _id: id });
+      if (!archivedStudent) {
+        skipped.push({ id, reason: "Archived student not found." });
+        continue;
+      }
+
+      const existingStudent = await Student.findOne({
+        name: archivedStudent.name,
+        subCategory: archivedStudent.subCategory
+      });
+      if (existingStudent) {
+        skipped.push({
+          id,
+          name: archivedStudent.name,
+          reason: "A student with this name is already in the same class."
+        });
+        continue;
+      }
+
+      await Student.create({
+        name: archivedStudent.name,
+        studentId: archivedStudent.studentId,
+        category: archivedStudent.category,
+        subCategory: archivedStudent.subCategory,
+        contact: archivedStudent.contact
+      });
+      await ArchivedStudent.findByIdAndDelete(id);
+      restoredIds.push(id);
+    }
+
+    if (restoredIds.length > 0) {
+      await Log.create({
+        adminEmail: req.admin.email,
+        action: "Student Archive Restore",
+        details: `Restored ${restoredIds.length} archived student${restoredIds.length === 1 ? "" : "s"}`
+      });
+    }
+
+    res.json({
+      message: `Restored ${restoredIds.length} student${restoredIds.length === 1 ? "" : "s"}.${skipped.length ? ` ${skipped.length} skipped.` : ""}`,
+      restoredIds,
+      skipped
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Student restore failed", error: err.message });
+  }
+});
+
 // GRADUATION / ARCHIVE
 router.post("/students/graduate", auth, async (req, res) => {
   const { subCategory } = req.body;
+  if (!subCategory || typeof subCategory !== "string") {
+    return res.status(400).json({ message: "A graduating class is required." });
+  }
+
   try {
     const graduatingStudents = await Student.find({ subCategory });
     if (graduatingStudents.length === 0) {
@@ -142,9 +215,11 @@ router.post("/students/graduate", auth, async (req, res) => {
     for (let s of graduatingStudents) {
       await ArchivedStudent.create({
         name: s.name,
+        studentId: s.studentId,
         category: s.category,
         subCategory: s.subCategory,
-        graduatedDate: new Date()
+        contact: s.contact,
+        graduationDate: new Date()
       });
       await Student.findByIdAndDelete(s._id);
     }

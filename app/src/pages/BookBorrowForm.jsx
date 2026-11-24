@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from "react";
 // ✅ CHANGED: Using centralized API instance instead of raw axios
 import API from "../api/axiosInstance"; 
-import { useNavigate } from "react-router-dom";
+import { getCached, setCached } from "../api/referenceDataCache";
 import BackButton from "../components/BackButton"; 
 import { CURRENCY_SYMBOL, formatCedi } from "../utils/currency";
 
 const BorrowBook = () => {
-  const navigate = useNavigate();
   const [catalog, setCatalog] = useState([]);
   const [students, setStudents] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -55,19 +54,21 @@ const BorrowBook = () => {
     const loadAllData = async () => {
      try {
         // ✅ CHANGED: Using API instance. No need to pass headers manually.
-        const [catRes, stdRes, stfRes, borrowRes, gnrRes] = await Promise.allSettled([
-          API.get("/bookCatalog"),
-          API.get("/students"),
-          API.get("/staff"),
+        const cached = ["catalog", "students", "staff", "generalUsers"].map(getCached);
+        const [catRes, stdRes, stfRes, borrowRes, gnrRes] = await Promise.all([
+          cached[0] ? Promise.resolve({ data: cached[0] }) : API.get("/bookCatalog"),
+          cached[1] ? Promise.resolve({ data: cached[1] }) : API.get("/students"),
+          cached[2] ? Promise.resolve({ data: cached[2] }) : API.get("/staff"),
           API.get("/books/borrowed"),
-          API.get("/general") 
+          cached[3] ? Promise.resolve({ data: cached[3] }) : API.get("/general")
         ]);
-
-        if (catRes.status === 'fulfilled') setCatalog(catRes.value.data || []);
-        if (stdRes.status === 'fulfilled') setStudents(stdRes.value.data || []);
-        if (stfRes.status === 'fulfilled') setStaff(stfRes.value.data || []);
-        if (borrowRes.status === 'fulfilled') setBorrowedRecords(borrowRes.value.data || []);
-        if (gnrRes.status === 'fulfilled') setGeneralUsers(gnrRes.value.data || []); 
+        const values = [catRes.data || [], stdRes.data || [], stfRes.data || [], gnrRes.data || []];
+        ["catalog", "students", "staff", "generalUsers"].forEach((key, i) => setCached(key, values[i]));
+        setCatalog(values[0]);
+        setStudents(values[1]);
+        setStaff(values[2]);
+        setBorrowedRecords(borrowRes.data || []);
+        setGeneralUsers(values[3]);
       } catch (err) {
         console.error("Data load error:", err);
       }

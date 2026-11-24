@@ -6,6 +6,8 @@ import { formatCedi } from "../utils/currency";
 
 const ActiveBorrowedBooks = () => {
   const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState({ show: false, message: "", type: "" });
   
@@ -27,12 +29,17 @@ const ActiveBorrowedBooks = () => {
   }, []);
 
   const fetchBooks = async () => {
+    setLoading(true);
+    setLoadError("");
     try {
       const response = await API.get("/books/active");
       setBooks(response.data);
       setTableSession(prev => prev + 1);
     } catch (error) {
       console.error("Failed to fetch books:", error);
+      setLoadError(error.response?.data?.message || "Unable to load active books.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,7 +58,7 @@ const ActiveBorrowedBooks = () => {
       fetchBooks();
       setTimeout(() => setStatus({ show: false }), 3000);
     } catch (error) {
-      setStatus({ show: true, message: "Return failed.", type: "error" });
+      setStatus({ show: true, message: error.response?.data?.message || "Return failed.", type: "error" });
     }
   };
 
@@ -171,7 +178,7 @@ const ActiveBorrowedBooks = () => {
                <label className="text-[8px] font-black text-gray-400 uppercase ml-1">From</label>
                <input type="date" className="text-[10px] font-bold outline-none" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
-            <div className="h-6 w-[2px] bg-yellow-200"></div>
+            <div className="h-6 w-0.5 bg-yellow-200" aria-hidden="true"></div>
             <div className="flex flex-col">
                <label className="text-[8px] font-black text-gray-400 uppercase ml-1">To</label>
                <input type="date" className="text-[10px] font-bold outline-none" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
@@ -208,6 +215,9 @@ const ActiveBorrowedBooks = () => {
       )}
 
       <div className="overflow-x-auto shadow-2xl rounded-2xl bg-white p-2 border-2 border-yellow-200">
+        {loading && <div className="p-8 text-center text-green-700 font-black animate-pulse">Loading active books...</div>}
+        {!loading && loadError && <div className="p-8 text-center text-red-600 font-bold">{loadError} <button onClick={fetchBooks} className="underline ml-2">Retry</button></div>}
+        {!loading && !loadError && (
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-green-700 text-yellow-300 uppercase text-[12px] tracking-widest">
@@ -300,6 +310,7 @@ const ActiveBorrowedBooks = () => {
             ))}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   );

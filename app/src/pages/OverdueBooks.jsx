@@ -80,7 +80,7 @@ const OverdueBooks = () => {
       });
       setStatus({ show: true, message: res.data.message, type: "success" });
       setEmailAddress(""); 
-    } catch (err) {
+    } catch {
       setStatus({ show: true, message: "Failed to send report.", type: "error" });
     } finally {
       setTimeout(() => setStatus({ show: false, message: "", type: "" }), 5000);

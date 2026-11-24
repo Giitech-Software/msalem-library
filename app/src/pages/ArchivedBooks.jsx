@@ -7,6 +7,8 @@ import { formatCedi } from "../utils/currency";
 const ArchivedBooks = () => {
   const [archivedBooks, setArchivedBooks] = useState([]);
   const [search, setSearch] = useState(""); 
+  const [restoringId, setRestoringId] = useState(null);
+  const [status, setStatus] = useState({ show: false, message: "", type: "" });
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBookId, setSelectedBookId] = useState(null);
@@ -32,6 +34,25 @@ const ArchivedBooks = () => {
       book.title?.toLowerCase().includes(search.toLowerCase()) ||
       book.borrowerId?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleRestore = async (book) => {
+    setRestoringId(book._id);
+    try {
+      const response = await API.put(`/books/restore/${book._id}`);
+      setArchivedBooks((currentBooks) => currentBooks.filter((item) => item._id !== book._id));
+      setStatus({ show: true, message: response.data.message, type: "success" });
+      setTimeout(() => setStatus({ show: false, message: "", type: "" }), 3000);
+    } catch (error) {
+      setStatus({
+        show: true,
+        message: error.response?.data?.message || "Failed to restore book.",
+        type: "error"
+      });
+      setTimeout(() => setStatus({ show: false, message: "", type: "" }), 5000);
+    } finally {
+      setRestoringId(null);
+    }
+  };
 
   const openDeleteModal = (id) => {
     setSelectedBookId(id);
@@ -63,6 +84,14 @@ const ArchivedBooks = () => {
   return (
     <div className="p-8 bg-yellow-50 min-h-screen border-2 border-yellow-200 relative font-sans">
       <BackButton label="⬅ Return to Dashboard" />
+
+      {status.show && (
+        <div className={`fixed top-4 right-4 z-50 p-3 rounded-lg shadow-xl font-bold text-sm ${
+          status.type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white"
+        }`}>
+          {status.message}
+        </div>
+      )}
       
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h1 className="text-3xl font-black text-green-700 uppercase tracking-tight italic">
@@ -127,12 +156,23 @@ const ArchivedBooks = () => {
                     </div>
                   </td>
                   <td className="py-1 px-4 text-center">
-                    <button
-                      onClick={() => openDeleteModal(book._id)}
-                      className="bg-red-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] hover:bg-red-700 transition-all uppercase shadow-sm active:scale-95 tracking-tighter"
-                    >
-                      Delete Permanently
-                    </button>
+                    <div className="flex flex-col sm:flex-row justify-center gap-2">
+                      {!isDigital && (
+                        <button
+                          onClick={() => handleRestore(book)}
+                          disabled={restoringId === book._id}
+                          className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] hover:bg-green-700 disabled:opacity-50 transition-all uppercase shadow-sm active:scale-95 tracking-tighter"
+                        >
+                          {restoringId === book._id ? "Restoring..." : "Restore"}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => openDeleteModal(book._id)}
+                        className="bg-red-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] hover:bg-red-700 transition-all uppercase shadow-sm active:scale-95 tracking-tighter"
+                      >
+                        Delete Permanently
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

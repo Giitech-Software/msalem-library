@@ -1,12 +1,10 @@
 import React, { useState, useRef } from "react";
 // ✅ Using centralized API instance
 import API from "../api/axiosInstance";
-import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton"; 
 import { CURRENCY_SYMBOL } from "../utils/currency";
 
 const AddBookCatalog = () => {
-  const navigate = useNavigate();
   const fileInputRef = useRef(null);
   
   const [formSession, setFormSession] = useState(0);

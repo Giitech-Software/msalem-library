@@ -46,7 +46,7 @@ const GeneralUserList = () => {
       setBulkNames("");
       setView("list");
       fetchUsers();
-    } catch (err) {
+    } catch {
       showStatus("Import failed.", "error");
     }
   };
@@ -58,7 +58,7 @@ const GeneralUserList = () => {
       showStatus("User updated!", "success");
       setEditingId(null);
       fetchUsers();
-    } catch (err) {
+    } catch {
       showStatus("Update failed.", "error");
     }
   };
@@ -70,7 +70,7 @@ const GeneralUserList = () => {
       showStatus("User removed.", "success");
       fetchUsers();
       setIsDeleteModalOpen(false);
-    } catch (err) {
+    } catch {
       showStatus("Delete failed.", "error");
     }
   };
@@ -155,7 +155,7 @@ const GeneralUserList = () => {
                 </div>
               ))}
               {filteredUsers.length === 0 && (
-                 <p className="col-span-full text-center text-gray-400 font-bold py-10">No users matching search.</p>
+                 <p className="col-span-full text-center text-gray-400 font-bold py-5">No users matching search.</p>
               )}
             </div>
           </>

@@ -1,0 +1,4 @@
+{"$$indexCreated":{"fieldName":"graduationDate","unique":false,"sparse":false}}
+{"$$indexCreated":{"fieldName":"subCategory","unique":false,"sparse":false}}
+{"$$indexCreated":{"fieldName":"graduationDate"}}
+{"$$indexCreated":{"fieldName":"subCategory"}}
