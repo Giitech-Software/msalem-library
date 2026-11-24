@@ -2,3 +2,6 @@
 {"$$indexCreated":{"fieldName":"name","unique":false,"sparse":false}}
 {"$$indexCreated":{"fieldName":"studentId","unique":false,"sparse":false}}
 {"$$indexCreated":{"fieldName":"subCategory","unique":false,"sparse":false}}
+{"$$indexCreated":{"fieldName":"name"}}
+{"$$indexCreated":{"fieldName":"studentId"}}
+{"$$indexCreated":{"fieldName":"subCategory"}}

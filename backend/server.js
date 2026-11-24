@@ -28,11 +28,16 @@ console.log(`[Database] Storing data in: ${dataDir}`);
 // ---------------------------------------------------------------------------
 // 🚀 APP INITIALIZATION
 // ---------------------------------------------------------------------------
+const bootstrapAdmin     = require('./bootstrapAdmin');
+
+// Repair legacy NeDB metadata before any model opens its database file.
+// This avoids modifying a file while NeDB is loading it.
+bootstrapAdmin.repairDatabaseFiles(dataDir);
+
 const authRoutes         = require('./routes/auth.routes');
 const bookRoutes         = require('./routes/book.routes');
 const bookCatalogRoutes  = require('./routes/bookCatalog.routes');
 const listRoutes         = require('./routes/lists');
-const bootstrapAdmin     = require('./bootstrapAdmin');
 
 const app = express();
 const PORT = process.env.PORT || 5000;

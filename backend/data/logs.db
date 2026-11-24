@@ -6,5 +6,6 @@
 {"adminEmail":"msalemschoollibrary@gmail.com","action":"Login","details":"Admin logged into the system","createdAt":{"$$date":1791236779540},"updatedAt":{"$$date":1791236779540},"_id":"bZ5tNHYQu1lEVFue"}
 {"adminEmail":"msalemschoollibrary@gmail.com","action":"Student Archive Restore","details":"Restored 1 archived student","createdAt":{"$$date":1791237706311},"updatedAt":{"$$date":1791237706311},"_id":"mVyZi5CmhIGhWq0J"}
 {"adminEmail":"msalemschoollibrary@gmail.com","action":"Login","details":"Admin logged into the system","createdAt":{"$$date":1791235475578},"updatedAt":{"$$date":1791235475578},"_id":"rAIeTgPblL5OZKFe"}
-{"$$indexCreated":{"fieldName":"createdAt","unique":false,"sparse":false}}
 {"adminEmail":"msalemschoollibrary@gmail.com","action":"Login","details":"Admin logged into the system","createdAt":{"$$date":1795562576406},"updatedAt":{"$$date":1795562576406},"_id":"rL00BkGJn8CX6hx3"}
+{"$$indexCreated":{"fieldName":"createdAt","unique":false,"sparse":false}}
+{"$$indexCreated":{"fieldName":"createdAt"}}

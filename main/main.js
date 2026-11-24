@@ -87,6 +87,17 @@ function writeBackendLog(message) {
   });
 }
 
+function getBackendFailureMessage() {
+  return [
+    'The library backend could not start.',
+    '',
+    'Your data has not been deleted. Check the backend log for the exact cause:',
+    backendLogPath || '(backend log path unavailable)',
+    '',
+    'Common causes are another process using port 5000, a locked data file, or a damaged database file.'
+  ].join('\n');
+}
+
 function waitForBackend(timeoutMs = 30000) {
   const startedAt = Date.now();
   return new Promise((resolve) => {
@@ -151,6 +162,12 @@ function startBackend() {
 
   backendProcess.stdout.on('data', (data) => writeBackendLog(`[backend] ${data}`));
   backendProcess.stderr.on('data', (data) => writeBackendLog(`[backend:error] ${data}`));
+  backendProcess.on('error', (error) => {
+    writeBackendLog(`[main:error] Failed to launch backend: ${error.stack || error.message}\n`);
+  });
+  backendProcess.on('exit', (code, signal) => {
+    writeBackendLog(`[main] Backend exited. code=${code ?? 'null'} signal=${signal ?? 'none'}\n`);
+  });
 
   return true;
 }
@@ -198,7 +215,7 @@ if (gotSingleInstanceLock) {
     if (startBackend()) {
       const backendReady = await waitForBackend();
       if (!backendReady) {
-        dialog.showErrorBox('Backend Timeout', 'The library server is taking too long to start.');
+        dialog.showErrorBox('Backend Startup Failed', getBackendFailureMessage());
       }
     }
     createWindow();

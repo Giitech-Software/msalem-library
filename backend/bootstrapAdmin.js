@@ -20,8 +20,6 @@ async function bootstrapAdmin() {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  repairDatabaseFiles(dataDir);
-
   const Admin = getAdminModel();
   const existingAdmins = await Admin.find();
 
@@ -59,12 +57,13 @@ function repairDatabaseFiles(dataDir) {
     'categories.db', 'financial_records.db', 'general_users.db',
     'logs.db', 'staff.db', 'students.db',
   ];
+  const backupDir = path.join(dataDir, 'backups', new Date().toISOString().replace(/[:.]/g, '-'));
   for (const fileName of databaseFiles) {
-    repairDatabaseFile(path.join(dataDir, fileName));
+    repairDatabaseFile(path.join(dataDir, fileName), backupDir);
   }
 }
 
-function repairDatabaseFile(dbPath) {
+function repairDatabaseFile(dbPath, backupDir) {
   if (!fs.existsSync(dbPath)) return;
 
   const lines = fs.readFileSync(dbPath, 'utf8').split(/\r?\n/);
@@ -97,7 +96,15 @@ function repairDatabaseFile(dbPath) {
     return line;
   });
 
-  if (changed) fs.writeFileSync(dbPath, repairedLines.join('\n'), 'utf8');
+  if (changed) {
+    fs.mkdirSync(backupDir, { recursive: true });
+    fs.copyFileSync(dbPath, path.join(backupDir, path.basename(dbPath)));
+    const tempPath = `${dbPath}.repair-${process.pid}.tmp`;
+    fs.writeFileSync(tempPath, repairedLines.join('\n'), 'utf8');
+    fs.renameSync(tempPath, dbPath);
+    console.log(`[Repair] Backup created at ${backupDir}`);
+  }
 }
 
 module.exports = bootstrapAdmin;
+module.exports.repairDatabaseFiles = repairDatabaseFiles;

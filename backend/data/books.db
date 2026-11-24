@@ -3,3 +3,8 @@
 {"$$indexCreated":{"fieldName":"bookType","unique":false,"sparse":false}}
 {"$$indexCreated":{"fieldName":"returnDate","unique":false,"sparse":false}}
 {"$$indexCreated":{"fieldName":"borrowerName","unique":false,"sparse":false}}
+{"$$indexCreated":{"fieldName":"borrowerId"}}
+{"$$indexCreated":{"fieldName":"returned"}}
+{"$$indexCreated":{"fieldName":"bookType"}}
+{"$$indexCreated":{"fieldName":"returnDate"}}
+{"$$indexCreated":{"fieldName":"borrowerName"}}
