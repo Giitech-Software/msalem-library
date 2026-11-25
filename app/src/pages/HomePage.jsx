@@ -115,7 +115,7 @@ const HomePage = () => {
       {/* --- STATIC FOOTER --- */}
       <footer className="w-full text-center p-4 bg-green-800 text-white border-t-4 border-yellow-400">
         <p className="text-xs md:text-sm font-medium opacity-90">
-          &copy; {new Date().getFullYear()} M'Salem School Library | Knowledge is Power
+          &copy; {new Date().getFullYear()} M'Salem School Library | Powered by ASTEM Software Lab
         </p>
       </footer>
 

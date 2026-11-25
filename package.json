@@ -14,7 +14,8 @@
     "productName": "M'Salem Library",
     "directories": {
       "app": ".",
-      "output": "dist_installer"
+      "output": "dist_installer",
+      "buildResources": "app/public"
     },
     "files": [
       "main/**/*",
@@ -48,7 +49,7 @@
     ],
     "asar": true,
     "win": {
-      "icon": "app/public/icon.ico",
+      "icon": "icon.ico",
       "forceCodeSigning": false,
       "target": [
         {

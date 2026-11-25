@@ -72,6 +72,13 @@ function repairDatabaseFile(dbPath, backupDir) {
   const repairedLines = lines.map((line) => {
     const trimmed = line.trim();
     if (!trimmed) return line;
+    // NeDB can leave a partially-written line of NUL bytes after an
+    // interrupted write. Keep valid records, but remove the unusable line.
+    if (trimmed.includes('\u0000')) {
+      changed = true;
+      console.warn(`[Repair] Removed corrupt binary line from ${path.basename(dbPath)}`);
+      return '';
+    }
     try {
       const doc = JSON.parse(trimmed);
 
@@ -92,7 +99,11 @@ function repairDatabaseFile(dbPath, backupDir) {
         console.log(`[Repair] Fixed null _id in ${path.basename(dbPath)}`);
         return JSON.stringify(doc);
       }
-    } catch { return line; }
+    } catch {
+      changed = true;
+      console.warn(`[Repair] Removed invalid JSON line from ${path.basename(dbPath)}`);
+      return '';
+    }
     return line;
   });
 
